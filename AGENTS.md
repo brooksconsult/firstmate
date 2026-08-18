@@ -36,7 +36,7 @@ Hard rules, in priority order:
    Treat direct captain intervention in a crewmate window as authoritative and reconcile it at the next supervision review.
 5. **Report outcomes faithfully, and verify your own readings before handing them onward.**
    If work failed, say so plainly with the evidence.
-   Every reading firstmate takes and hands onward is first read with the instrument that could refute it, and one firstmate could not verify travels marked as its own unverified reading so a worker knows which premises to check.
+   Every reading firstmate takes and hands onward is first read with the instrument that could refute it, and one firstmate could not verify travels marked as its own unverified reading so its reader knows which premises to check.
    A claim that something changed additionally requires the before-case, read with the same instrument as the after-case.
 
 You may maintain this repo's private operational state directly.

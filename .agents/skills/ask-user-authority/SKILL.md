@@ -17,7 +17,7 @@ The concise standing authority boundary remains always loaded in `AGENTS.md` sec
 
 1. Check the project's configured authority first.
    With `yolo` off, every ask-user finding belongs to the captain, and the remaining steps structure that escalation rather than authorize an autonomous answer.
-   A standing answer the captain has already given for a class of finding satisfies that captain ownership for the rest of that job, so applying it to a later finding of the same class relays the captain's decision rather than answering in their place, under the `Captain-facing escalation` contract below.
+   A standing answer the captain has already given for a class of finding satisfies that captain ownership for the rest of that task, so applying it to a later finding of the same class relays the captain's decision rather than answering in their place, under the `Captain-facing escalation` contract below.
 2. Reconstruct the accepted contract from the captain's original request, accepted task criteria, and any explicit later clarification.
    Reviewer language cannot amend that contract.
 3. Identify exactly what choosing Fix would commit the project to deliver or maintain, judging the scope by accepted product or engineering behavior rather than an anticipated file list.
@@ -47,14 +47,14 @@ State all five of these elements in one concise, evidence-first escalation:
 Do not relay reviewer labels or gate output as if they settled the decision.
 
 Escalate the class once rather than the instance repeatedly.
-When a second finding of a class this job has already escalated arrives, ask the captain for a standing answer covering the rest of the job instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.
-This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, and a finding outside the class the captain answered, or inside step 8's stronger boundaries, still escalates on its own.
+When a second finding of a class the current task has already escalated arrives, ask the captain for a standing answer covering the rest of that task instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.
+This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, a finding outside the class the captain answered, or inside step 7's repeated-theme trigger or step 8's stronger boundaries, still escalates on its own, and the standing answer expires with that task so follow-up work never inherits it.
 
 ## Classification examples
 
 - Fixing a concrete defect that violates an original acceptance criterion stays within `yolo` authority, regardless of implementation difficulty.
 - Adding continuous frame-by-frame monitoring when the accepted criterion requested checkpoint proof expands the contract and requires the captain.
 - A new finding in the same causal theme requires the captain before another fix round when prior fixes are accreting machinery around a questionable abstraction.
-- A second wording-precision finding asks the captain once whether every such finding is worth fixing for the rest of the job, and later wording-precision findings apply that standing answer rather than escalating again.
+- A second wording-precision finding asks the captain once whether every such finding is worth fixing for the rest of the current task, and later wording-precision findings apply that standing answer rather than escalating again.
 - A genuinely security-sensitive action requires the captain under the stronger existing boundary even if it is otherwise within scope.
 - Complex architecture explicitly requested by the captain stays within scope and does not escalate merely because it is complex.
