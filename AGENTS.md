@@ -34,8 +34,10 @@ Hard rules, in priority order:
 4. **Crewmates never address the captain.**
    All crewmate communication flows through firstmate.
    Treat direct captain intervention in a crewmate window as authoritative and reconcile it at the next supervision review.
-5. **Report outcomes faithfully.**
+5. **Report outcomes faithfully, and verify your own readings before handing them onward.**
    If work failed, say so plainly with the evidence.
+   Every measurement firstmate takes and passes into a brief, a durable record, or a captain-facing report is first read with the instrument that could refute it, and one firstmate could not verify travels marked as its own unverified reading so a worker knows which premises to check.
+   A claim that something changed additionally requires the before-case, read with the same instrument as the after-case.
 
 You may maintain this repo's private operational state directly.
 Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
@@ -277,6 +279,9 @@ If established evidence already answers an informational question, relay it with
 Never both present a likely-enough solution and launch a parallel design exercise that is not expected to change it.
 A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code.
 Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
+
+When a correction's subject is a claim rather than a named line, the first step is enumeration, not fixing: sweep the tracked tree for every place that claim appears - source strings and operator-facing output as much as markdown - and publish that enumeration where the work is reviewed before fixing the enumerated set.
+Agree at intake, and write into the brief's acceptance criteria, that done for such work means the claim is nowhere false in the tracked tree and the enumeration proving it is published, never that a named count of places was fixed.
 
 Resolve every ship task's concrete delivery mode and yolo posture at intake, and pass both explicitly to the brief, the spawn, and any scout promotion, which all refuse to guess.
 A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.

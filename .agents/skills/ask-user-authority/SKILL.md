@@ -45,10 +45,15 @@ State all five of these elements in one concise, evidence-first escalation:
 
 Do not relay reviewer labels or gate output as if they settled the decision.
 
+Escalate the class once rather than the instance repeatedly.
+When a second finding of a class this job has already escalated arrives, ask the captain for a standing answer covering the rest of the job instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.
+This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, and a finding outside the class the captain answered, or inside step 8's stronger boundaries, still escalates on its own.
+
 ## Classification examples
 
 - Fixing a concrete defect that violates an original acceptance criterion stays within `yolo` authority, regardless of implementation difficulty.
 - Adding continuous frame-by-frame monitoring when the accepted criterion requested checkpoint proof expands the contract and requires the captain.
 - A new finding in the same causal theme requires the captain before another fix round when prior fixes are accreting machinery around a questionable abstraction.
+- A second wording-precision finding asks the captain once whether every such finding is worth fixing for the rest of the job, and later wording-precision findings apply that standing answer rather than escalating again.
 - A genuinely security-sensitive action requires the captain under the stronger existing boundary even if it is otherwise within scope.
 - Complex architecture explicitly requested by the captain stays within scope and does not escalate merely because it is complex.
