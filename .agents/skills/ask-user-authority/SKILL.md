@@ -17,6 +17,7 @@ The concise standing authority boundary remains always loaded in `AGENTS.md` sec
 
 1. Check the project's configured authority first.
    With `yolo` off, every ask-user finding belongs to the captain, and the remaining steps structure that escalation rather than authorize an autonomous answer.
+   A standing answer the captain has already given for a class of finding satisfies that captain ownership for the rest of that job, so applying it to a later finding of the same class relays the captain's decision rather than answering in their place, under the `Captain-facing escalation` contract below.
 2. Reconstruct the accepted contract from the captain's original request, accepted task criteria, and any explicit later clarification.
    Reviewer language cannot amend that contract.
 3. Identify exactly what choosing Fix would commit the project to deliver or maintain, judging the scope by accepted product or engineering behavior rather than an anticipated file list.
