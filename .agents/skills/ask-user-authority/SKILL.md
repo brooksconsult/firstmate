@@ -48,7 +48,7 @@ Do not relay reviewer labels or gate output as if they settled the decision.
 
 Escalate the class once rather than the instance repeatedly.
 When a second finding of a class the current task has already escalated arrives, ask the captain for a standing answer covering the rest of that task instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.
-This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, a finding outside the class the captain answered, or inside step 7's repeated-theme trigger or step 8's stronger boundaries, still escalates on its own, and the standing answer expires with that task so follow-up work never inherits it.
+This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, a finding outside the class the captain answered, or inside step 7's questionable-abstraction condition or step 8's stronger boundaries, still escalates on its own, and the standing answer expires with that task so follow-up work never inherits it.
 
 ## Classification examples
 
