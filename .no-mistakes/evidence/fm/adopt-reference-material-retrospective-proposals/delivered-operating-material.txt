@@ -1,0 +1,84 @@
+============================================================
+ DELIVERED OPERATING MATERIAL - what a firstmate agent loads
+ repo: 01M0BANY7WSM0B8TFPAYTB6CN1   commit: 61110e8
+============================================================
+
+--- LOAD PATH 1: always-loaded context ------------------------
+$ cat CLAUDE.md
+<!-- Points Claude at AGENTS.md via import; edit AGENTS.md, not this file. -->
+@AGENTS.md
+  -> harness inlines the @AGENTS.md import, so every line below is
+     in context on every turn, with no trigger required.
+
+### OWNER: AGENTS.md hard rule 5  (proposals 1 and 2)
+$ sed -n '30,41p' AGENTS.md
+3. **Never tear down unlanded work.**
+   Uncommitted changes are never landed, and `bin/fm-teardown.sh` owns the complete landed-work test.
+   Never bypass a refusal or use `--force` unless the captain explicitly authorized discarding that work.
+   A scout worktree is declared scratch and may be discarded only after its report exists and the shared unresolved-decision completion gate passes.
+4. **Crewmates never address the captain.**
+   All crewmate communication flows through firstmate.
+   Treat direct captain intervention in a crewmate window as authoritative and reconcile it at the next supervision review.
+5. **Report outcomes faithfully, and verify your own readings before handing them onward.**
+   If work failed, say so plainly with the evidence.
+   Every reading firstmate takes and hands onward is first read with the instrument that could refute it, and one firstmate could not verify travels marked as its own unverified reading so its reader knows which premises to check.
+   A claim that something changed additionally requires the before-case, read with the same instrument as the after-case.
+
+
+### OWNER: AGENTS.md section 7 'Intake and authority'  (proposals 3 and 5)
+$ grep -n '^#\{2,4\} ' AGENTS.md   # the owning heading, inside always-loaded context
+255:## 7. Task lifecycle
+259:### Intake and authority
+Never both present a likely-enough solution and launch a parallel design exercise that is not expected to change it.
+A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code.
+Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
+
+When a correction's subject is a claim rather than a named line, the first step is enumeration, not fixing: sweep the tracked tree for every place that claim appears - source strings and operator-facing output as much as markdown - and publish that enumeration where the work is reviewed before fixing the enumerated set.
+Agree at intake, and write into the brief's acceptance criteria, that done for such work means the claim is nowhere false in the tracked tree and the enumeration proving it is published, never that a named count of places was fixed.
+
+Resolve every ship task's concrete delivery mode and yolo posture at intake, and pass both explicitly to the brief, the spawn, and any scout promotion, which all refuse to guess.
+A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.
+On a `no-mistakes-prod-only` project, classify the task's surface: internal-only tooling, automation, contributor or operator process, and release or submission work ships `direct-PR`, while product-facing, mixed, and uncertain work ships `no-mistakes`; never infer internal-only from file location or project name.
+An unregistered project or absent registry resolves to `no-mistakes` with yolo off, and the registration gap goes to the captain.
+
+--- LOAD PATH 2: triggered skill ------------------------------
+$ ls -l .claude/skills
+  lrwxr-xr-x@ 1 brooks  staff  17 Aug 18 16:58 .claude/skills -> ../.agents/skills
+  -> .claude/skills resolves into the tracked .agents/skills tree,
+     so the skill below is the one the harness offers the agent.
+
+$ sed -n '1,9p' .claude/skills/ask-user-authority/SKILL.md   # the trigger that loads it
+---
+name: ask-user-authority
+description: >-
+  Agent-only decision procedure for ask-user findings.
+  Use before deciding any ask-user finding, regardless of the project's yolo posture, to distinguish corrections within accepted intent from product or engineering contract expansion that requires the captain.
+user-invocable: false
+metadata:
+  internal: true
+---
+
+### OWNER: ask-user-authority 'Captain-facing escalation'  (proposal 4)
+$ sed -n '/^## Captain-facing escalation/,/^## Classification/p' .claude/skills/ask-user-authority/SKILL.md
+## Captain-facing escalation
+
+State all five of these elements in one concise, evidence-first escalation:
+
+1. The original requirement or accepted task criterion.
+2. The proposed product or engineering contract expansion.
+3. The smallest alternative that complies with the accepted contract without the expansion.
+4. The concrete consequences of accepting and declining the expansion.
+5. A recommendation with the reason it best serves the accepted intent.
+
+Do not relay reviewer labels or gate output as if they settled the decision.
+
+Escalate the class once rather than the instance repeatedly.
+When a second finding of a class the current task has already escalated arrives, ask the captain for a standing answer covering the rest of that task instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.
+This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, a finding outside the class the captain answered, or inside step 7's questionable-abstraction condition or step 8's stronger boundaries, still escalates on its own, and the standing answer expires with that task so follow-up work never inherits it.
+
+## Classification examples
+
+$ grep -n 'AGENTS.md pointer that already loads this skill'
+Before deciding any ask-user finding, load `ask-user-authority`; the implementation worker never answers its own finding.
+- `ask-user-authority` - load before deciding any ask-user finding, regardless of the project's `yolo` posture.
+  -> both pointers pre-date this change; no new always-loaded line was added.

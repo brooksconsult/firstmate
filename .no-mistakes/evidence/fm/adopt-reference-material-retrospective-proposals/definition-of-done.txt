@@ -1,0 +1,39 @@
+==================================================================
+ DEFINITION OF DONE - verified against the tracked tree at 61110e8
+==================================================================
+
+[1] Each of the five stated EXACTLY ONCE, at its owner
+    $ git grep -F -c '<anchor sentence>' -- .
+#    anchor sentence                                          occurrences
+1    verify own readings                                      1  (AGENTS.md:1)
+2    changed-claim needs before-case                          1  (AGENTS.md:1)
+3    enumerate before fixing                                  1  (AGENTS.md:1)
+4    escalate the class once                                  1  (.agents/skills/ask-user-authority/SKILL.md:1)
+5    agree done at intake                                     1  (AGENTS.md:1)
+
+[2] No rule gained a second surface: no new file, skill, or section
+    $ git diff --numstat 03bb1d8..HEAD
+      6	0	.agents/skills/ask-user-authority/SKILL.md
+      6	1	AGENTS.md
+    $ git diff --diff-filter=A --name-only 03bb1d8..HEAD   # files added
+      0 added
+    $ git diff -U0 03bb1d8..HEAD -- '*.md' | grep -E '^\+#'   # headings added
+      0 added
+    AGENTS.md: 570 -> 575 lines
+
+[3] Deliberate exclusions NOT reintroduced (scan of added lines only)
+      round budget     occurrences in added lines: 0
+      finding cap      occurrences in added lines: 0
+      at most          occurrences in added lines: 0
+      maximum          occurrences in added lines: 0
+      no more than     occurrences in added lines: 0
+      .sh              occurrences in added lines: 0
+      checker          occurrences in added lines: 0
+      tooling          occurrences in added lines: 0
+      ask-user -> captain rule intact:
+        SKILL.md:19:   With `yolo` off, every ask-user finding belongs to the captain, and the remaining steps structure that escalation rather than authorize an autonomous answer.
+        SKILL.md:34:The implementation worker never decides or answers its own ask-user finding.
+
+[4] Private material deliberately out of scope
+      data/captain.md, data/learnings.md tracked? -> 0 tracked paths under data/
+      'Maintaining this file' section touched? -> 0 diff lines

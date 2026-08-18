@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>The five retrospective proposals, as delivered to a firstmate agent</title>
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--line:#262b36;--ink:#e6e9ef;--dim:#98a1b3;
+        --always:#4ea1ff;--trigger:#c084fc;--ok:#3ddc97;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box;min-width:0}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+       padding:36px 32px 48px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+  .sub code{font-family:var(--mono);font-size:12.5px;color:#c3cbdb}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px 22px;margin-bottom:18px}
+  .owner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:4px}
+  .owner h2{font-size:16px;margin:0;font-family:var(--mono);font-weight:600;color:#fff}
+  .badge{font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;
+         border-radius:999px;font-weight:700;white-space:nowrap}
+  .b-always{background:rgba(78,161,255,.14);color:var(--always);border:1px solid rgba(78,161,255,.35)}
+  .b-trigger{background:rgba(192,132,252,.14);color:var(--trigger);border:1px solid rgba(192,132,252,.35)}
+  .prop{color:var(--dim);font-size:12.5px;font-family:var(--mono)}
+  .trig{margin:10px 0 14px;font-size:13px;color:var(--dim);border-left:2px solid var(--line);padding-left:12px}
+  .trig b{color:#c3cbdb;font-weight:600}
+  .text{background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+        font-family:var(--mono);font-size:12.5px;line-height:1.72;white-space:pre-wrap;
+        overflow-wrap:anywhere;color:#dfe5f0}
+  .text .new{color:#fff;background:rgba(61,220,151,.10);
+             box-shadow:inset 3px 0 0 var(--ok);display:block;padding:2px 0 2px 9px;margin:2px -9px}
+  .catch{margin-top:13px;font-size:13.5px;color:#b9c2d3}
+  .catch b{color:var(--ok);font-weight:600}
+  .dod{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 24px}
+  .dod > div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .dod .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim)}
+  .dod .v{font-size:19px;font-weight:700;margin-top:3px;color:var(--ok)}
+  .dod .n{font-size:12px;color:var(--dim);margin-top:2px}
+  footer{color:var(--dim);font-size:12.5px;margin-top:8px;border-top:1px solid var(--line);padding-top:14px}
+</style></head><body><div class="wrap">
+
+<h1>The five adopted proposals, as a firstmate agent receives them</h1>
+<p class="sub">Rendered from the tracked tree at <code>61110e8</code> &middot; source of authority: <code>data/reference-material-looping-retrospective/report.md</code> &middot; adopted by the captain 2026-08-18</p>
+
+<div class="dod">
+  <div><div class="k">Stated exactly once</div><div class="v">5 / 5</div><div class="n">verified by <code>git grep</code> over the tracked tree</div></div>
+  <div><div class="k">New file, skill, section, tooling</div><div class="v">0</div><div class="n">2 files touched, +12 / -1</div></div>
+  <div><div class="k">Always-loaded growth</div><div class="v">570 &rarr; 575</div><div class="n">AGENTS.md lines</div></div>
+</div>
+
+<div class="card">
+  <div class="owner"><h2>AGENTS.md &rsaquo; hard rule 5</h2>
+    <span class="badge b-always">always loaded</span>
+    <span class="prop">proposals 1 + 2</span></div>
+  <div class="trig"><b>Why this owner:</b> these fire whenever firstmate hands a reading onward, so they are unconditional principle. <code>diagnostic-reasoning</code> was rejected - its trigger is bug diagnosis, and neither false reading arose from one.</div>
+  <div class="text">5. <b>Report outcomes faithfully<span class="new" style="display:inline;box-shadow:none;background:rgba(61,220,151,.10);padding:0 3px">, and verify your own readings before handing them onward.</span></b>
+   If work failed, say so plainly with the evidence.
+<span class="new">Every reading firstmate takes and hands onward is first read with the instrument that could refute it, and one firstmate could not verify travels marked as its own unverified reading so its reader knows which premises to check.</span><span class="new">A claim that something changed additionally requires the before-case, read with the same instrument as the after-case.</span></div>
+  <div class="catch"><b>Would it have caught the two?</b> Reading <code>/statuses</code> alongside <code>/status</code> catches the first false reading; reading a pre-rule push catches the second. Both were change-claims made without the before-case.</div>
+</div>
+
+<div class="card">
+  <div class="owner"><h2>AGENTS.md &rsaquo; 7. Task lifecycle &rsaquo; Intake and authority</h2>
+    <span class="badge b-always">always loaded</span>
+    <span class="prop">proposals 3 + 5</span></div>
+  <div class="trig"><b>Why not a skill:</b> the failure was firstmate not <i>recognising</i> the subject was a class, and a skill firstmate must recognise the class to load cannot catch that case. Recognition has to sit at the intake step that always runs.</div>
+  <div class="text"><span class="new">When a correction's subject is a claim rather than a named line, the first step is enumeration, not fixing: sweep the tracked tree for every place that claim appears - source strings and operator-facing output as much as markdown - and publish that enumeration where the work is reviewed before fixing the enumerated set.</span><span class="new">Agree at intake, and write into the brief's acceptance criteria, that done for such work means the claim is nowhere false in the tracked tree and the enumeration proving it is published, never that a named count of places was fixed.</span></div>
+  <div class="catch"><b>Would it have caught the two?</b> The repository-wide sweep found seven places where the brief named two - enumerating first surfaces those five in one round instead of one per round. And "nowhere false, enumeration published" is a definition of done that can actually be met.</div>
+</div>
+
+<div class="card">
+  <div class="owner"><h2>ask-user-authority &rsaquo; Captain-facing escalation</h2>
+    <span class="badge b-trigger">skill trigger</span>
+    <span class="prop">proposal 4</span></div>
+  <div class="trig"><b>Trigger that loads it:</b> "Use before deciding any ask-user finding, regardless of the project's yolo posture" - it already fired all twelve times on the second failure. AGENTS.md section 7 already carries the load pointer, so <b>no new always-loaded line was added</b>.</div>
+  <div class="text"><span class="new">Escalate the class once rather than the instance repeatedly.</span><span class="new">When a second finding of a class the current task has already escalated arrives, ask the captain for a standing answer covering the rest of that task instead of re-asking per finding, then apply that answer to every later finding of that class through the ordinary decision path without another escalation.</span><span class="new">This batches the captain's decision rather than replacing it: a genuinely different question is still its own escalation, a finding outside the class the captain answered, or inside step 7's questionable-abstraction condition or step 8's stronger boundaries, still escalates on its own, and the standing answer expires with that task so follow-up work never inherits it.</span></div>
+  <div class="catch"><b>Would it have caught the two?</b> Roughly eight of twelve escalations were one question in different clothes; the class answer covers them without changing an outcome. It batches escalation - it never removes it.</div>
+</div>
+
+<footer>Refusals from the report, verified absent from the diff: no round budget, no finding cap, no new tooling or checker, and no weakening of the rule that sends ask-user findings to the captain (<code>SKILL.md:19</code> and <code>SKILL.md:34</code> intact).</footer>
+</div></body></html>
