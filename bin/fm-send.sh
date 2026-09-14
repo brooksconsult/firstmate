@@ -43,9 +43,11 @@
 # instruction. There is no delivered-unconfirmed
 # outcome on this plane: "did the doorbell land" is no longer the question -
 # "was the message acted on" is, and that is answered asynchronously for an
-# ordinary record by the worker's acknowledgement move into handled/, with the
-# watcher re-ringing an unacknowledged message and escalating a stuck one. An
-# explicit fire-and-forget record is excluded from that ladder.
+# ordinary record by the worker's acknowledgement move into handled/. The
+# watcher re-rings an unacknowledged message while its endpoint remains
+# available, escalates after the bounded ladder, and instead routes a positively
+# dead or missing endpoint directly to recovery without typing. An explicit
+# fire-and-forget record is excluded from that ladder.
 # bin/fm-task-inbox-lib.sh owns the record format, the doorbell line, and the
 # re-ring ladder. The composer pre-check before the ring is ADVISORY only: when
 # the composer visibly holds pending text the ring is skipped with a notice and
@@ -68,10 +70,11 @@
 # failure); any other nonzero = the send failed and nothing may be assumed
 # delivered. Submission dispatches through the target's recorded backend; the
 # tmux adapter shares its composer/submit core with the away-mode daemon via
-# bin/fm-tmux-lib.sh. Tune with FM_SEND_RETRIES (default 3) / FM_SEND_SLEEP
-# (0.4). Slash commands, and codex `$...` skill invocations resolved through
-# harness meta, get a longer pre-Enter settle so completion popups do not
-# swallow Enter. A remote secondmate target has no typed text plane at all:
+# bin/fm-tmux-lib.sh. Tune with FM_SEND_RETRIES (default 3; agy typed targets
+# default to 20 for agy's late busy render) / FM_SEND_SLEEP (0.4). Slash
+# commands, and codex `$...` skill invocations resolved through harness meta,
+# get a longer pre-Enter settle so completion popups do not swallow Enter.
+# A remote secondmate target has no typed text plane at all:
 # every remote text steer rides the inbox (a marked secondmate request already
 # reaches the harness as marker-prefixed chat rather than a parser command, so
 # routing a remote "/..." or "$..." through the record changes nothing the
@@ -543,7 +546,7 @@ fm_send_hold_resolved_id() {  # <task-id> <decision-key>
   local show id state hold_kind
   command -v tasks-axi >/dev/null 2>&1 || return 1
   for id in "$2" "$1-decision-$2"; do
-    show=$( (cd "$FM_HOME" && tasks-axi show "$id" --full) 2>/dev/null ) || continue
+    show=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE='' "$SCRIPT_DIR/fm-tasks-axi.sh" show "$id" --full 2>/dev/null) || continue
     state=$(printf '%s\n' "$show" | sed -n 's/^  state: //p' | head -1)
     hold_kind=$(printf '%s\n' "$show" | sed -n 's/^  hold_kind: //p' | head -1)
     [ "$state" != "done" ] || continue
@@ -1002,12 +1005,14 @@ else
       fm_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
     fi
     # Ring the doorbell, best-effort: no ring outcome changes the exit status,
-    # because the watcher's re-ring ladder owns loss detection from here.
+    # because the watcher owns loss detection from here, either through its
+    # bounded re-ring ladder or direct unavailable-endpoint recovery.
     ring_rc=0
     fm_task_inbox_ring "$TARGET_BACKEND" "$T" "$INBOX_RECORD" "$EXPECTED_LABEL" || ring_rc=$?
     case "$ring_rc" in
       1) echo "fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and the watcher will re-ring" >&2 ;;
       2) echo "fm-send: doorbell did not reach $T; the steer is durably recorded at $INBOX_RECORD and the watcher will re-ring" >&2 ;;
+      3) echo "fm-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
     exit 0
   fi
@@ -1026,7 +1031,21 @@ else
       ;;
     *) settle=0.3 ;;
   esac
-  retries=${FM_SEND_RETRIES:-3}
+  # Per-harness submit-confirm budget. agy's bare `>` composer verdict is
+  # `unknown`, so a landed submit is acknowledged only by the idle-to-busy
+  # transition poll, and agy renders its verified busy footer well after the
+  # shared budget expires: ~1.5s after Enter for a short steer, ~4-5s for a
+  # realistic longer brief (live-measured, agy 1.2.1), against the shared
+  # default's 3 x 0.4s. With the shared default a typed steer to an agy
+  # endpoint was reported exit-1 non-delivery for a message that landed and
+  # ran, inviting a duplicate resend. agy typed targets get a longer default
+  # budget (~8s at the default cadence, twice the worst measured render); an
+  # explicit FM_SEND_RETRIES still wins, and every other harness keeps the
+  # shared 3-retry default untouched.
+  case "$TARGET_HARNESS" in
+    agy) retries=${FM_SEND_RETRIES:-20} ;;
+    *) retries=${FM_SEND_RETRIES:-3} ;;
+  esac
   sleep_s=${FM_SEND_SLEEP:-0.4}
   # Type once, submit, verify. Only exact empty confirms delivery; every other
   # verdict preserves the loud refusal boundary. Only LOCAL targets reach this
