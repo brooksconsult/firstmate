@@ -427,8 +427,8 @@ Fleet supervision is an always-loaded operational contract; `docs/architecture.m
 - No turn ends blind while work is under way, including turns described as holding or waiting.
 
 At the start of every wake-handling turn, drain the durable wake queue before peeking, reading beyond the reason line, steering, or starting work.
-A queued wake also blocks the next dispatch: when any command or guard warns that wakes are pending, drain and handle them before spawning, syncing, or tearing down, rather than letting the tool's own warning be how you find out.
 Session start is the only exception because its one-shot digest already presented the queue while locked or deliberately left it untouched in lock-refused read-only mode.
+A queued wake also blocks the next dispatch: when a command or guard warns of pending wakes this turn has not yet drained, drain and handle them before spawning, syncing, or tearing down, rather than letting the tool's own warning be how you find out.
 Treat any `OPEN DECISIONS` section from the drain as actionable reconciliation input even when no wake record was queued.
 Treat any `UNREAD STATUS` section as newly surfaced status that must be read this turn; those lines are not re-printed after this presentation.
 Treat any `RECORD DIVERGENCE` section as a contradiction between two records of one captain call, never as proof the captain ruled; load `captain-hold-lifecycle` and reconcile it in whichever direction the evidence supports.
@@ -535,7 +535,7 @@ Reach the captain immediately for:
 - When the automatic transition gate applies, dispatch and completion move the item themselves - `bin/fm-spawn.sh` and `bin/fm-teardown.sh` own those transitions and refuse rather than report success without them - so what remains yours is filing the item before dispatch, recording decisions, and keeping notes current; `docs/configuration.md` owns gate applicability and the manual-backend exception.
 - Re-evaluate queued work after every teardown and heartbeat, dispatching items only when dependencies and time gates have cleared.
 
-- `.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax; read that help before using a flag rather than guessing one.
+- `.tasks.toml`, `docs/configuration.md`, and `bin/fm-tasks-axi.sh <command> --help` own the backlog schema, compatibility, retention, and routine command syntax; read that help before using a flag rather than guessing one.
 - Every backlog and hold call goes through the wrapper - `bin/fm-tasks-axi.sh` for the backlog and `bin/fm-captain-hold.sh` for holds - so it reaches this home's records from any directory.
   Never invoke the bare `tasks-axi` binary, pass your own `--file`, or hand-edit the backlog file when the configured backend selects the tool; use the documented manual path only in a manual-backend home, and keep only the configured recent Done entries.
 - `secondmate-provisioning` and `bin/fm-backlog-handoff.sh` own cross-home handoff safety.
