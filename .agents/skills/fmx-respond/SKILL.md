@@ -249,7 +249,7 @@ The follow-up budget above is a courtesy.
 A **promised final reply** - "I'll report back when this lands" - is a commitment, and forgetting it is publicly visible.
 Never carry one in your head: the moment you promise a specific outcome in a public thread, turn it into durable state and let the scripts reconcile it.
 This section is the sole owner of that procedure.
-`tasks-axi public-followup --help` owns the typed obligation, its states, and its file contracts; `bin/fm-public-followup.sh --help` owns firstmate's flags; do not restate either here.
+`bin/fm-tasks-axi.sh public-followup --help` owns the typed obligation, its states, and its file contracts; `bin/fm-public-followup.sh --help` owns firstmate's flags; do not restate either here.
 
 This is also the **only** mechanism that reaches work outside this home.
 The lightweight link of step 3 writes into this home's own task record, so it can never bind a second mate's task; `--work-home secondmate:<id>` here can.
