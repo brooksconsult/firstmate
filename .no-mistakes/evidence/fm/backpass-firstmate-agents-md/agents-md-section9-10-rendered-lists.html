@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>AGENTS.md sections 9-10 rendered lists</title>
+<style>
+  body { margin: 0; background: #f6f8fa; color: #1f2328; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  header { padding: 16px 24px; border-bottom: 1px solid #d1d9e0; background: #fff; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: #59636e; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px 24px; }
+  .col { min-width: 0; background: #fff; border: 1px solid #d1d9e0; border-radius: 6px; padding: 8px 24px 16px; }
+  .col > h2.title { font-size: 14px; color: #59636e; border-bottom: 1px solid #d1d9e0; padding-bottom: 8px; margin: 8px 0 16px; }
+  .md p { margin: 0 0 16px; }
+  .md h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid #d1d9e0; margin: 24px 0 16px; }
+  .md ul { padding-left: 2em; margin: 0 0 16px; }
+  .md li + li { margin-top: .25em; }
+  .md li > p { margin-top: 16px; margin-bottom: 0; }
+  .md code { font: 85% ui-monospace, SFMono-Regular, Menlo, monospace; background: #eff1f3; padding: .2em .4em; border-radius: 6px; overflow-wrap: anywhere; }
+  .md a { color: #0969da; text-decoration: none; }
+  .badge { display: inline-block; font: 600 12px/1 ui-monospace, Menlo, monospace; background: #ddf4ff; color: #0550ae; border-radius: 999px; padding: 4px 10px; margin: 4px 0 6px; }
+  .badge.warn { background: #ffebe9; color: #a40e26; }
+  .frame { border-left: 3px solid #afb8c1; padding-left: 4px; margin-bottom: 16px; }
+  .badge.warn + .frame { border-left-color: #cf222e; }
+</style></head>
+<body>
+<header><h1>AGENTS.md "Reach the captain immediately for:" through section 10, rendered as CommonMark (marked 15.0.12)</h1>
+<p>Each rendered list is labelled with its item count. A red label marks a list that absorbed bullets written after a blank line.</p></header>
+<div class="grid">
+  <div class="col"><h2 class="title">Base a5f5432 (before)</h2><div class="md"><p>Reach the captain immediately for:</p>
+<div class="badge ">rendered list 1: 6 items, tight</div><div class="frame"><ul>
+<li>Work ready for their review, with the PR&#39;s recorded URL.</li>
+<li>Finished investigation findings, relayed as findings rather than only a completion notice.</li>
+<li>Gate findings that <code>ask-user-authority</code> escalates.</li>
+<li>A real blocker or failure after the relevant playbook is exhausted.</li>
+<li>Anything destructive, irreversible, or security-sensitive.</li>
+<li>A needed credential or login.</li>
+</ul>
+</div><p>In a secondmate home, reaching the captain means appending the outcome to the parent channel your charter names; a captain-facing sentence in that home&#39;s chat has not been sent, and <a href="docs/secondmate-parent-channel.md"><code>docs/secondmate-parent-channel.md</code></a> owns which outcomes the home&#39;s own scripts deliver there without you.
+Do not surface automatic fixes, retries, routine progress, or internal supervision mechanics.
+When a routine operational update&#39;s specific event requires no action but a response must be sent, reply exactly <code>Captain, shipshape.</code> without characterizing the visible session&#39;s unrelated decisions.
+Batch non-urgent updates into the next natural reply.
+Use plain chat for a yes-or-no decision and <code>lavish-axi</code> only when several options or a structured report benefit from a visual surface.
+Whenever a PR is mentioned, include its full <code>https://...</code> URL when the task&#39;s ready status or <code>pr=</code> metadata holds one, copied verbatim and never assembled from memory; when neither does yet, report only the identifier you actually have.
+Mention cost as a courtesy when unusually much work is running, but never block on it.</p>
+<h2>10. Backlog contract</h2>
+<p>The configured <code>tasks-axi</code> backend is the durable queue; the tracked default is <code>data/backlog.md</code>.
+It tracks work items only, never agents; persistent secondmates never appear as backlog items.
+Work routed to a secondmate is recorded in that secondmate home&#39;s own backlog, not the main backlog.
+A decision is simply a task held for the captain: create the task with <code>bin/fm-tasks-axi.sh add</code> when needed, then always hold it through <code>bin/fm-captain-hold.sh hold &lt;id&gt; --reason &quot;&lt;reason&gt;&quot;</code>, with <code>--until &lt;date&gt;</code> when the captain defers it.
+When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
+Captain calls discovered by investigations or visual reviews follow <code>captain-hold-lifecycle</code>, which owns their completion gate and recorded-answer rules.
+When the automatic transition gate applies, dispatch and completion move the item themselves - <code>bin/fm-spawn.sh</code> and <code>bin/fm-teardown.sh</code> own those transitions and refuse rather than report success without them - so what remains yours is filing the item before dispatch, recording decisions, and keeping notes current; <code>docs/configuration.md</code> owns gate applicability and the manual-backend exception.
+Re-evaluate queued work after every teardown and heartbeat, dispatching items only when dependencies and time gates have cleared.</p>
+<p><code>.tasks.toml</code>, <code>docs/configuration.md</code>, and current <code>tasks-axi --help</code> own the backlog schema, compatibility, retention, and routine command syntax.
+Use compatible <code>tasks-axi</code> when the configured backend selects it, always through <code>bin/fm-tasks-axi.sh</code> so the call reaches this home&#39;s backlog from any directory, and the documented manual path otherwise; keep only the configured recent Done entries.
+<code>secondmate-provisioning</code> and <code>bin/fm-backlog-handoff.sh</code> own cross-home handoff safety.</p>
+</div></div>
+  <div class="col"><h2 class="title">Target 6ac5ea7 (after)</h2><div class="md"><p>Reach the captain immediately for:</p>
+<div class="badge warn">rendered list 1: 13 items, loose</div><div class="frame"><ul>
+<li><p>Work ready for their review, with the PR&#39;s recorded URL.</p>
+</li>
+<li><p>Finished investigation findings, relayed as findings rather than only a completion notice.</p>
+</li>
+<li><p>Gate findings that <code>ask-user-authority</code> escalates.</p>
+</li>
+<li><p>A real blocker or failure after the relevant playbook is exhausted.</p>
+</li>
+<li><p>Anything destructive, irreversible, or security-sensitive.</p>
+</li>
+<li><p>A needed credential or login.</p>
+</li>
+<li><p>In a secondmate home, reaching the captain means appending the outcome to the parent channel your charter names; a captain-facing sentence in that home&#39;s chat has not been sent, and <a href="docs/secondmate-parent-channel.md"><code>docs/secondmate-parent-channel.md</code></a> owns which outcomes the home&#39;s own scripts deliver there without you.</p>
+</li>
+<li><p>Do not surface automatic fixes, retries, routine progress, or internal supervision mechanics.
+Check counts, &quot;still running&quot;, unchanged poll results, and elapsed-time notes are routine progress: stay silent rather than sending them.</p>
+</li>
+<li><p>When a routine operational update&#39;s specific event requires no action but a response must be sent, reply <code>Captain, shipshape.</code> and nothing else - no appended status, counts, check results, or characterization of the visible session&#39;s unrelated decisions.
+It is a complete reply, never a greeting to open a status paragraph with.</p>
+</li>
+<li><p>Batch non-urgent updates into the next natural reply.</p>
+</li>
+<li><p>Use plain chat for a yes-or-no decision and <code>lavish-axi</code> only when several options or a structured report benefit from a visual surface.</p>
+</li>
+<li><p>Whenever a PR is mentioned, include its full <code>https://...</code> URL when the task&#39;s ready status or <code>pr=</code> metadata holds one, copied verbatim and never assembled from memory; when neither does yet, report only the identifier you actually have.</p>
+</li>
+<li><p>Mention cost as a courtesy when unusually much work is running, but never block on it.</p>
+</li>
+</ul>
+</div><h2>10. Backlog contract</h2>
+<div class="badge warn">rendered list 2: 11 items, loose</div><div class="frame"><ul>
+<li><p>The configured <code>tasks-axi</code> backend is the durable queue; the tracked default is <code>data/backlog.md</code>.</p>
+</li>
+<li><p>It tracks work items only, never agents; persistent secondmates never appear as backlog items.</p>
+</li>
+<li><p>Work routed to a secondmate is recorded in that secondmate home&#39;s own backlog, not the main backlog.</p>
+</li>
+<li><p>A decision is simply a task held for the captain: create the task with <code>bin/fm-tasks-axi.sh add</code> when needed, then always hold it through <code>bin/fm-captain-hold.sh hold &lt;id&gt; --reason &quot;&lt;reason&gt;&quot;</code>, with <code>--until &lt;date&gt;</code> when the captain defers it.</p>
+</li>
+<li><p>When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.</p>
+</li>
+<li><p>Captain calls discovered by investigations or visual reviews follow <code>captain-hold-lifecycle</code>, which owns their completion gate and recorded-answer rules.</p>
+</li>
+<li><p>When the automatic transition gate applies, dispatch and completion move the item themselves - <code>bin/fm-spawn.sh</code> and <code>bin/fm-teardown.sh</code> own those transitions and refuse rather than report success without them - so what remains yours is filing the item before dispatch, recording decisions, and keeping notes current; <code>docs/configuration.md</code> owns gate applicability and the manual-backend exception.</p>
+</li>
+<li><p>Re-evaluate queued work after every teardown and heartbeat, dispatching items only when dependencies and time gates have cleared.</p>
+</li>
+<li><p><code>.tasks.toml</code>, <code>docs/configuration.md</code>, and <code>bin/fm-tasks-axi.sh &lt;command&gt; --help</code> own the backlog schema, compatibility, retention, and routine command syntax; read that help before using a flag rather than guessing one.</p>
+</li>
+<li><p>Every backlog and hold call goes through the wrapper - <code>bin/fm-tasks-axi.sh</code> for the backlog and <code>bin/fm-captain-hold.sh</code> for holds - so it reaches this home&#39;s records from any directory.
+Never invoke the bare <code>tasks-axi</code> binary, pass your own <code>--file</code>, or hand-edit the backlog file when the configured backend selects the tool; use the documented manual path only in a manual-backend home, and keep only the configured recent Done entries.</p>
+</li>
+<li><p><code>secondmate-provisioning</code> and <code>bin/fm-backlog-handoff.sh</code> own cross-home handoff safety.</p>
+</li>
+</ul>
+</div></div></div>
+</div>
+</body></html>

@@ -1,0 +1,76 @@
+# AGENTS.md section 8: "when a command or guard warns of pending wakes this turn has not yet drained,
+#                       drain and handle them before spawning, syncing, or tearing down"
+# Scratch home, main actor, one ship task in flight, live watcher; real guard/drain/fleet-sync.
+
+== 1. A worker signal (its PR merged) is queued before main's wake-handling turn ==
+rows still in state/.wake-queue: 1
+
+$ bin/fm-guard.sh
+--- stderr
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+>> Nothing drained this turn yet, so the rule applies: drain and handle before anything else.
+
+== 2. Main drains at the start of the wake-handling turn ==
+
+$ bin/fm-wake-drain.sh
+--- stdout
+1789516391	1	signal	task-a.status	signal: task-a: PR merged
+--- stderr
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36760.1789516391.KSQ3gk
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+rows still in state/.wake-queue: 1
+>> Presented, but the row stays queued until the acknowledgement, so the drain's own closing guard repeats the warning.
+
+== 3. Handling that merged PR needs the fleet sync; the guard inside it warns again ==
+
+$ bin/fm-fleet-sync.sh
+--- stderr
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+>> These rows were already drained this turn, so the scoped rule lets the sync - the handling itself - proceed.
+
+== 4. What the replaced unscoped wording demanded instead: drain again before syncing ==
+
+$ bin/fm-wake-drain.sh
+--- stdout
+1789516391	1	signal	task-a.status	signal: task-a: PR merged
+--- stderr
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36760.1789516391.KSQ3gk
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+rows still in state/.wake-queue: 1
+>> Same row presented a second time, same warning: draining cannot clear it, so the sync never gets its turn.
+
+== 5. Handling complete: acknowledge through the presented boundary ==
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 36760.1789516391.KSQ3gk
+[exit 0]
+rows still in state/.wake-queue: 0
+0
+
+$ bin/fm-guard.sh
+[exit 0]
+>> Queue clear, guard silent.
+
+== 6. A fresh wake lands later in the turn: this one has NOT been drained ==
+
+$ bin/fm-guard.sh
+--- stderr
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+>> The rule applies again: drain and handle it before the next spawn, sync, or teardown.
+
+$ bin/fm-wake-drain.sh
+--- stdout
+1789516392	2	signal	task-b.status	signal: task-b: needs captain input
+--- stderr
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 37873.1789516392.xIzoXG
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 37873.1789516392.xIzoXG
+[exit 0]
+rows still in state/.wake-queue: 0
+0

@@ -1,0 +1,51 @@
+# AGENTS.md section 10 now names `bin/fm-tasks-axi.sh <command> --help` as the help to read before using a flag.
+# Scratch home (FM_DATA_OVERRIDE=<scratch>/data), tasks-axi 0.2.4.
+
+$ bin/fm-tasks-axi.sh --help | head -9     # wrapper-only usage, no tasks-axi flags
+fm-tasks-axi.sh - run tasks-axi against THIS home's backlog from any working directory.
+
+Usage: fm-tasks-axi.sh [<tasks-axi command> [args...]]
+       fm-tasks-axi.sh --help
+
+Every routine firstmate backlog read or mutation goes through this command
+rather than a bare `tasks-axi`; `fm-tasks-axi.sh <command> --help` prints
+tasks-axi's own help. Arguments reach tasks-axi as given, apart from one
+rewrite that keeps file arguments meaning what the caller meant: a relative
+[exit 0]
+
+$ bin/fm-tasks-axi.sh list --help         # tasks-axi own help, reached through the wrapper
+usage: tasks-axi list [flags]
+flags:
+  --state <queued|in_flight|done|held>, --repo <name>, --kind <name>, --blocked
+  --limit <n>, --fields <a,b,c>  (extra: blocked, blocked_by, body, closed, created, delivery_state, deps, held, hold_kind, hold_reason, hold_until, links, priority)
+examples:
+  tasks-axi list --state queued
+  tasks-axi list --repo no-mistakes --fields blocked_by,created
+  tasks-axi list --blocked
+[exit 0]
+
+$ bin/fm-tasks-axi.sh add --help
+usage: tasks-axi add <id> "<title>" [flags]
+aliases: create
+flags:
+  --kind <ship|scout|docs|...>, --repo <name>, --body <text> or --body-file <path>
+  --start (place in In flight) | --queue (place in Queued, default)
+  --blocked-by <id> (repeatable, must exist), --pr <url>, --report <path>, --priority <0-4>
+  --mint [--prefix <p>]   mint a slug-xx id from the title instead of passing one
+  --json   print the resulting task as a JSON object
+examples:
+  tasks-axi add lavish-foo-q9 "fix summary toggle" --kind ship --repo lavish-axi --start
+  tasks-axi add fm-x "adopt lease" --blocked-by treehouse-lease-t4
+  tasks-axi add "quick note" --mint
+[exit 0]
+
+$ bin/fm-tasks-axi.sh list --json         # the guessed flag the help rule was added for
+error: "Unknown flag: --json"
+code: VALIDATION_ERROR
+help[1]: Run the command with --help to see supported flags
+
+[exit 0]
+
+$ bin/fm-tasks-axi.sh list --file other.md   # section 10: never pass your own --file
+fm-tasks-axi: this command always addresses this home's backlog at <scratch>/data; drop --file, or run tasks-axi directly for another backlog
+[exit 2]

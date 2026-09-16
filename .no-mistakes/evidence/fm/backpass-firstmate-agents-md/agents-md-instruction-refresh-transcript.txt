@@ -1,0 +1,36 @@
+# AGENTS.md delivery to a running Pi primary session (real bin/fm-session-start.sh, fm-session-start.test.sh fixtures)
+
+$ fm-session-start.sh --source startup                 # on-disk AGENTS.md = base a5f5432
+exit ok; SESSION START digest present: 1; instruction refresh sections: 0
+
+$ fm-session-start.sh --reemit --source compact        # AGENTS.md updated on disk to target 305ea04
+exit 0
+INSTRUCTION REFRESH header at output line 17; BOOTSTRAP digest starts at line 647
+
+--- refresh preamble (as emitted)
+CURRENT AGENTS.md - INSTRUCTION REFRESH
+================================================================================
+The complete on-disk AGENTS.md below supersedes the instruction copy this session
+started with. Apply it as the current Firstmate instruction contract.
+
+--- embedded contract: byte-identical to target AGENTS.md (624 lines)
+--- after the contract (emitted lines until BOOTSTRAP)
+
+
+--- kept edits and review-round wording as the session receives them (line within the refresh)
+  10:If your working directory is inside `projects/`, state that conflict and settle the role before you act: a project working directory never converts firstmate into the worker.
+  17:  Every means every: a one-line progress note, an interstitial "now I'll do X", a mid-turn update, and a question all carry it, not just the session's opening and closing messages.
+  179:- The digest is the only read of the context, backlog, metadata, and bulk status it printed: do not hand-read those files again this turn unless a source was reported absent or corrupt, older hist
+  431:  A printed warning that supervision is down is itself the trigger: run the emitted repair once and read its refusal as evidence rather than re-arming past it, and do not merge, dispatch, or conti
+  435:Session start is the only exception because its one-shot digest already presented the queue while locked or deliberately left it untouched in lock-refused read-only mode.
+  436:A queued wake also blocks the next dispatch: when a command or guard warns of pending wakes this turn has not yet drained, drain and handle them before spawning, syncing, or tearing down, rather t
+  522:Everything else follows this etiquette:
+  526:  Check counts, "still running", unchanged poll results, and elapsed-time notes are routine progress: stay silent rather than sending them.
+  527:- When a routine operational update's specific event requires no action but a response must be sent, reply `Captain, shipshape.` and nothing else - no appended status, counts, check results, or ch
+  528:  It is a complete reply, never a greeting to open a status paragraph with.
+  536:- The configured `tasks-axi` backend is the durable queue; the tracked default is `data/backlog.md`.
+  545:- `.tasks.toml`, `docs/configuration.md`, and `bin/fm-tasks-axi.sh <command> --help` own the backlog schema, compatibility, retention, and routine command syntax; read that help before using a fla
+  547:  Never invoke the bare `tasks-axi` binary, pass your own `--file`, or hand-edit the backlog file when the configured backend selects the tool; use the documented manual path only in a manual-back
+--- replaced wording no longer delivered (count within the refresh)
+  "when any command or guard warns that wakes are pending": 0
+  "current `tasks-axi --help`": 0

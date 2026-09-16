@@ -1,0 +1,33 @@
+
+=== a5f5432 ===
+  section 9 list: 11 items (tight)
+      first: worktree, checkout, primary checkout, or local-main -> local cop
+      last:  fail-open, fails open, passive fail-open, or degraded-open -> st
+  section 9 list: 6 items (tight)
+      first: Work ready for their review, with the PR's recorded URL.
+      last:  A needed credential or login.
+  -> "Reach the captain immediately for:" list ends with: A needed credential or login.
+  -> etiquette bullets absorbed into the escalation list: no
+
+=== 98ac169 ===
+  section 9 list: 11 items (tight)
+      first: worktree, checkout, primary checkout, or local-main -> local cop
+      last:  fail-open, fails open, passive fail-open, or degraded-open -> st
+  section 9 list: 13 items (loose)
+      first: Work ready for their review, with the PR's recorded URL.
+      last:  Mention cost as a courtesy when unusually much work is running, 
+  -> "Reach the captain immediately for:" list ends with: Mention cost as a courtesy when unusually much work is running, 
+  -> etiquette bullets absorbed into the escalation list: YES (meaning inverted)
+
+=== 305ea04 ===
+  section 9 list: 11 items (tight)
+      first: worktree, checkout, primary checkout, or local-main -> local cop
+      last:  fail-open, fails open, passive fail-open, or degraded-open -> st
+  section 9 list: 6 items (tight)
+      first: Work ready for their review, with the PR's recorded URL.
+      last:  A needed credential or login.
+  section 9 list: 7 items (tight)
+      first: In a secondmate home, reaching the captain means appending the o
+      last:  Mention cost as a courtesy when unusually much work is running, 
+  -> "Reach the captain immediately for:" list ends with: A needed credential or login.
+  -> etiquette bullets absorbed into the escalation list: no
