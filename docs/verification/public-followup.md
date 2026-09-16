@@ -11,7 +11,7 @@ This record supports six active guarantees for promised public replies made thro
 5. A public loop whose work lives in a REMOTE secondmate home retires when readable remote state proves no link exists, or after readable and writable remote state clears the matching bound legacy Relay link; unreadable state, a non-writable matching link, an identity mismatch, a metadata lock it cannot acquire within its bound, or unconfirmed completion retains the loop instead of hanging, and `--force` still covers only the unresolved obligation.
 6. Work bound to a REMOTE secondmate home can report its typed terminal result: the instructions name paths that exist on the worker's own machine, the owning home collects results for open registrations over that route, an unreachable route fails loudly, an empty reachable route is a healthy no-op, and a non-open registration is skipped without contact.
 
-[`docs/configuration.md`](../configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, [`docs/architecture.md`](../architecture.md#optional-relay) owns the mechanism boundary, and `tasks-axi public-followup --help` owns the typed obligation schema.
+[`docs/configuration.md`](../configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, [`docs/architecture.md`](../architecture.md#optional-relay) owns the mechanism boundary, and `bin/fm-tasks-axi.sh public-followup --help` owns the typed obligation schema.
 Task chronology and delivery evidence stay outside this record.
 
 ## Environment
