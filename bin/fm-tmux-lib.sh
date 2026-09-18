@@ -58,13 +58,13 @@
 #
 # fm_tmux_resolve_pane matches the target exactly against one pane inventory
 # read and prints the matched pane's stable id, which tmux resolves exactly or
-# not at all. Accepted forms: %<pane-id>, @<window-id>, <session>:@<window-id>,
-# <session>:<window-name>, and <session>:<window-index> when no window in that
-# session has the exact name. A window target means its active pane, as in
-# tmux's own resolution. Returns 0 with the pane id printed, 1 when the target
-# is authoritatively absent (no exact match, missing session, or no server),
-# and 2 when the inventory is unreadable or the target is malformed or names
-# more than one window.
+# not at all. Accepted forms: %<pane-id>, @<window-id>, <session>:<window-name>,
+# and <session>:<window-index> when no window in that session has the exact
+# name. A window target means its active pane, as in tmux's own resolution.
+# Returns 0 with the pane id printed, 1 when the target is authoritatively
+# absent (no exact match, missing session, or no server), and 2 when the
+# inventory is unreadable or the target is malformed or names more than one
+# window.
 fm_tmux_resolve_pane() {  # <target>
   local target=${1:-} session='' rest='' inventory status=0
   case "$target" in
@@ -113,7 +113,6 @@ fm_tmux_resolve_pane() {  # <target>
       ambiguous = 0
       if (target ~ /^%/) found = pick("pane", target)
       else if (target ~ /^@/) found = pick("id", target)
-      else if (rest ~ /^@[0-9]+$/) found = pick("id", rest)
       else {
         found = pick("name", rest)
         if (found == "" && !ambiguous && rest ~ /^[0-9]+$/) found = pick("index", rest)
