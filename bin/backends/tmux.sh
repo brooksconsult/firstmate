@@ -4,8 +4,8 @@
 # Reference backend (AGENTS.md section 8; data/fm-backend-design-d7). P1 moved
 # the tmux command sequences that fm-send.sh, fm-peek.sh, fm-watch.sh,
 # fm-spawn.sh, and fm-teardown.sh already ran inline into named functions
-# here; each one now resolves its target exactly before running them. Sourced
-# only through bin/fm-backend.sh's fm_backend_source, never directly.
+# here; each read and send now resolves its target exactly before running them.
+# Sourced only through bin/fm-backend.sh's fm_backend_source, never directly.
 #
 # Worktree acquisition (running `treehouse get` inside the pane, and polling
 # its cwd) is unchanged by this extraction: P1 scopes only the session
@@ -35,9 +35,10 @@ fm_backend_tmux_resolve_bare_selector() {  # <name>
     || { echo "error: no window named $name" >&2; return 1; }
 }
 
-# Every function below that takes a <target> resolves it exactly through
+# Every read and send below resolves its <target> exactly through
 # fm_tmux_pane_ref (bin/fm-tmux-lib.sh) before tmux sees it, so a closed window
 # reads as absent instead of answering from whatever window tmux falls back to.
+# fm_backend_tmux_kill instead hands tmux its own exact `=session:=window` form.
 # fm_backend_tmux_absent reports that refusal on stderr for callers that surface
 # tmux's own error text.
 fm_backend_tmux_absent() {  # <target>

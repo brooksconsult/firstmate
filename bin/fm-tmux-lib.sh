@@ -7,8 +7,9 @@
 # backend dispatch, while bin/fm-composer-lib.sh owns the shared verdict.
 #
 # Composer shapes and verdicts are owned by bin/fm-composer-lib.sh.
-# This file owns only tmux's styled capture, cursor and Pi identity primitives,
-# delivery busy read, and submit conversions that consume the shared verdict.
+# This file owns only tmux's exact target resolution, styled capture, cursor and
+# Pi identity primitives, capability descriptor, delivery busy read, and submit
+# conversions that consume the shared verdict.
 # Styled captures remain internal; fm-peek and every human-facing capture stay
 # plain.
 #
@@ -35,11 +36,7 @@
 # Composer classification is NOT owned here: every shape, glyph, border
 # family, geometry rule, and verdict decision lives in the shared
 # bin/fm-composer-lib.sh (fm_composer_classify_screen), sourced below and
-# reused by every backend adapter so the decision cannot drift. This file
-# keeps only tmux's genuine capture-side primitives - the styled pane
-# capture, the #{cursor_y} cursor read, the pi foreground-process identity
-# probe, and the capability descriptor - plus the busy detection and submit
-# cores that consume the shared verdict.
+# reused by every backend adapter so the decision cannot drift.
 
 # shellcheck source=bin/fm-composer-lib.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/fm-composer-lib.sh"
