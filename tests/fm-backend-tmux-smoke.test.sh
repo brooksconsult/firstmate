@@ -209,6 +209,9 @@ echo "state_prefix=$(fm_backend_agent_state tmux "$session:$prefix")"
 echo "capture_gone=$(verdict fm_backend_tmux_capture "$session:$gone" 5)"
 echo "capture_prefix=$(verdict fm_backend_tmux_capture "$session:$prefix" 5)"
 echo "capture_live=$(verdict fm_backend_tmux_capture "$session:$live" 5)"
+echo "capture_gone_error=$(fm_backend_tmux_capture "$session:$gone" 5 2>&1 >/dev/null)"
+echo "capture_dup=$(verdict fm_backend_tmux_capture "$session:fm-dup" 5)"
+echo "capture_dup_error=$(fm_backend_tmux_capture "$session:fm-dup" 5 2>&1 >/dev/null)"
 echo "command_gone=$(nonempty fm_backend_tmux_current_command "$session:$gone")"
 echo "command_live=$(nonempty fm_backend_tmux_current_command "$session:$live")"
 echo "path_gone=$(nonempty fm_backend_tmux_current_path "$session:$gone")"
@@ -231,6 +234,11 @@ PREFIX="fm-smoke1"
 LIVE="fm-smoke1-sibling"
 tmux new-window -d -t "$SESSION:" -n "$LIVE" 'sleep 600' \
   || fail "real tmux: could not create the live sibling window"
+# Two windows sharing one name: tmux cannot say which one a recorded target
+# meant, so the adapter must not report either as missing.
+tmux new-window -d -t "$SESSION:" -n fm-dup 'sleep 600' \
+  && tmux new-window -d -t "$SESSION:" -n fm-dup 'sleep 600' \
+  || fail "real tmux: could not create the duplicate-name windows"
 tmux list-windows -t "=$SESSION" -F '#{window_name}' | grep -qx "$GONE" \
   && fail "the missing-window fixture unexpectedly exists"
 tmux list-windows -t "=$SESSION" -F '#{window_name}' | grep -qx "$PREFIX" \
@@ -257,6 +265,9 @@ assert_missing_probes() {  # <output> <context>
     key_gone key_prefix literal_prefix line_prefix; do
     expect_probe "$out" "$key" no "$ctx"
   done
+  expect_probe "$out" capture_dup no "$ctx"
+  expect_probe "$out" capture_gone_error "error: tmux target '$SESSION:$GONE' does not exist" "$ctx"
+  expect_probe "$out" capture_dup_error "error: tmux target '$SESSION:fm-dup' could not be resolved exactly (the pane list was unreadable, or the name matches more than one window)" "$ctx"
   expect_probe "$out" state_gone missing "$ctx"
   expect_probe "$out" state_prefix missing "$ctx"
   expect_probe "$out" busy_gone unknown "$ctx"

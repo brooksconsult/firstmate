@@ -123,6 +123,9 @@ submit() {  # <text>
 wait_for_file "$HOME_DIR/state/.lock" 180 "the fleet session lock"
 LOCK_PID=$(cat "$HOME_DIR/state/.lock" 2>/dev/null)
 PANE_PID=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t primary '#{pane_pid}' 2>/dev/null)
+# The daemon receives the primary's own $TMUX_PANE, an exact pane id, as its
+# supervisor target; away-mode delivery below targets that same id.
+PRIMARY_PANE=$("$REAL_TMUX" -L "$SOCKET" list-panes -t '=primary' -F '#{pane_id}' 2>/dev/null | head -1)
 [ -n "$LOCK_PID" ] && [ "$LOCK_PID" = "$PANE_PID" ] \
   || harness_fail "the session lock must be owned by the Cursor pane process (lock=$LOCK_PID pane=$PANE_PID); Cursor is not resolving in the session-lock ancestry"
 pass "cursor primary: the sessionStart hook takes the fleet lock as the Cursor process itself"
@@ -187,11 +190,11 @@ set -u
 tmux() { command "$REAL_TMUX" -L "$SOCKET" "\$@"; }
 export -f tmux 2>/dev/null || true
 export FM_STATE_OVERRIDE="$HOME_DIR/state"
-export FM_SUPERVISOR_TARGET=primary
+export FM_SUPERVISOR_TARGET=$PRIMARY_PANE
 export FM_SUPERVISOR_BACKEND=tmux
 export FM_DAEMON_PRIMARY_HARNESS=cursor
 . "$HOME_DIR/bin/fm-supervise-daemon.sh"
-composer=\$(fm_backend_composer_state tmux primary)
+composer=\$(fm_backend_composer_state tmux $PRIMARY_PANE)
 printf 'composer=%s\n' "\$composer"
 [ "\$composer" = empty ] || exit 3
 inject_msg "AWAY PROBE - reply with exactly the token $AWAY_TOKEN and nothing else." "$HOME_DIR/state"

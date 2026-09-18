@@ -39,10 +39,16 @@ fm_backend_tmux_resolve_bare_selector() {  # <name>
 # fm_tmux_pane_ref (bin/fm-tmux-lib.sh) before tmux sees it, so a closed window
 # reads as absent instead of answering from whatever window tmux falls back to.
 # fm_backend_tmux_kill instead hands tmux its own exact `=session:=window` form.
-# fm_backend_tmux_absent reports that refusal on stderr for callers that surface
-# tmux's own error text.
-fm_backend_tmux_absent() {  # <target>
-  echo "error: tmux target '$1' does not exist" >&2
+# fm_backend_tmux_unresolved reports that refusal on stderr for callers that
+# surface tmux's own error text, keeping an authoritatively absent target
+# (resolver status 1) apart from one it could not decide (status 2), so a live
+# worker is never reported gone because the pane list could not be read.
+fm_backend_tmux_unresolved() {  # <target> <resolver-status>
+  if [ "${2:-2}" = 1 ]; then
+    echo "error: tmux target '$1' does not exist" >&2
+  else
+    echo "error: tmux target '$1' could not be resolved exactly (the pane list was unreadable, or the name matches more than one window)" >&2
+  fi
   return 1
 }
 
@@ -50,7 +56,7 @@ fm_backend_tmux_absent() {  # <target>
 # fm-peek.sh's and fm-watch.sh's `tmux capture-pane -p -t "$T" -S -"$N"`.
 fm_backend_tmux_capture() {  # <target> <lines>
   local pane
-  pane=$(fm_tmux_pane_ref "$1") || fm_backend_tmux_absent "$1" || return 1
+  pane=$(fm_tmux_pane_ref "$1") || { fm_backend_tmux_unresolved "$1" "$?"; return 1; }
   tmux capture-pane -p -t "$pane" -S -"$2"
 }
 
@@ -58,7 +64,7 @@ fm_backend_tmux_capture() {  # <target> <lines>
 # pane. Mirrors fm-send.sh's --key path.
 fm_backend_tmux_send_key() {  # <target> <key>
   local pane
-  pane=$(fm_tmux_pane_ref "$1") || fm_backend_tmux_absent "$1" || return 1
+  pane=$(fm_tmux_pane_ref "$1") || { fm_backend_tmux_unresolved "$1" "$?"; return 1; }
   tmux send-keys -t "$pane" "$2"
 }
 
@@ -125,7 +131,7 @@ fm_backend_tmux_current_path() {  # <target>
 # inline in fm-spawn.sh. Mirrors `tmux send-keys -t "$T" "<text>" Enter`.
 fm_backend_tmux_send_text_line() {  # <target> <text>
   local pane
-  pane=$(fm_tmux_pane_ref "$1") || fm_backend_tmux_absent "$1" || return 1
+  pane=$(fm_tmux_pane_ref "$1") || { fm_backend_tmux_unresolved "$1" "$?"; return 1; }
   tmux send-keys -t "$pane" "$2" Enter
 }
 
@@ -135,7 +141,7 @@ fm_backend_tmux_send_text_line() {  # <target> <text>
 # Mirrors `tmux send-keys -t "$T" -l "<text>"`.
 fm_backend_tmux_send_literal() {  # <target> <text>
   local pane
-  pane=$(fm_tmux_pane_ref "$1") || fm_backend_tmux_absent "$1" || return 1
+  pane=$(fm_tmux_pane_ref "$1") || { fm_backend_tmux_unresolved "$1" "$?"; return 1; }
   tmux send-keys -t "$pane" -l "$2"
 }
 
