@@ -1,0 +1,18 @@
+E2E: real bin/fm-session-start.sh run from inside a pane of a real tmux 3.6b server (private socket).
+World: session firstmate; fm-alpha live; fm-beta and fm-gamma windows closed (as after the terminal restart); remote secondmate sm-far recorded with remote_host=far-box.
+
+Premise, observed from inside the pane (identical in both runs):
+  premise: tmux display-message -p -t firstmate:fm-beta #{pane_id} -> exit 0, printed '%0'
+  premise: tmux has-session -t firstmate:fm-beta -> exit 1, printed 'can't find window: fm-beta'
+
+BEFORE fix (base ac6396c) - FLEET STATE endpoint lines:
+  endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+  endpoint: alive (backend=tmux window=firstmate:fm-beta)
+  endpoint: alive (backend=tmux window=firstmate:fm-gamma)
+  endpoint: alive (backend=tmux window=remote:sm-far)
+
+AFTER fix (f8535e4) - FLEET STATE endpoint lines:
+  endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+  endpoint: dead (backend=tmux window=firstmate:fm-beta)
+  endpoint: dead (backend=tmux window=firstmate:fm-gamma)
+  endpoint: remote (host=far-box), liveness not probed locally

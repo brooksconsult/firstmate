@@ -1,0 +1,49 @@
+=== [AFTER fix (f8535e4)] tree: /Users/brooks/.no-mistakes/worktrees/3ee91a062752/01M2SB3JHCG292ETEWW8B7935V (f8535e4)
+=== tmux 3.6b, private socket; live windows in session firstmate:
+    0: main
+    1: fm-alpha
+context: TMUX_PANE=%0
+premise: tmux display-message -p -t firstmate:fm-beta #{pane_id} -> exit 0, printed '%0'
+premise: tmux has-session -t firstmate:fm-beta -> exit 1, printed 'can't find window: fm-beta'
+=== bin/fm-session-start.sh exit status: 0
+=== FLEET STATE > Work under way (verbatim digest excerpt):
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+
+--- alpha ---
+window=firstmate:fm-alpha
+kind=ship
+harness=claude
+endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.IkR9sD/home/state/alpha.status)
+
+--- beta ---
+window=firstmate:fm-beta
+kind=ship
+harness=claude
+endpoint: dead (backend=tmux window=firstmate:fm-beta)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.IkR9sD/home/state/beta.status)
+
+--- gamma ---
+window=firstmate:fm-gamma
+kind=ship
+harness=claude
+endpoint: dead (backend=tmux window=firstmate:fm-gamma)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.IkR9sD/home/state/gamma.status)
+
+--- sm-far ---
+window=remote:sm-far
+endpoint_task_id=sm-far
+kind=secondmate
+harness=claude
+home=/srv/fm-sm-far
+remote_host=far-box
+remote_root=/srv/fm-sm-far
+endpoint: remote (host=far-box), liveness not probed locally
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.IkR9sD/home/state/sm-far.status)
+
+=== endpoint verdict lines:
+endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+endpoint: dead (backend=tmux window=firstmate:fm-beta)
+endpoint: dead (backend=tmux window=firstmate:fm-gamma)
+endpoint: remote (host=far-box), liveness not probed locally

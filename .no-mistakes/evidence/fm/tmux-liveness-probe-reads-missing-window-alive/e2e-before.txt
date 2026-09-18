@@ -1,0 +1,49 @@
+=== [BEFORE fix (base ac6396c)] tree: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T/fm-base-tree.EN1AFp (ac6396c)
+=== tmux 3.6b, private socket; live windows in session firstmate:
+    0: main
+    1: fm-alpha
+context: TMUX_PANE=%0
+premise: tmux display-message -p -t firstmate:fm-beta #{pane_id} -> exit 0, printed '%0'
+premise: tmux has-session -t firstmate:fm-beta -> exit 1, printed 'can't find window: fm-beta'
+=== bin/fm-session-start.sh exit status: 0
+=== FLEET STATE > Work under way (verbatim digest excerpt):
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+
+--- alpha ---
+window=firstmate:fm-alpha
+kind=ship
+harness=claude
+endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.noKoh8/home/state/alpha.status)
+
+--- beta ---
+window=firstmate:fm-beta
+kind=ship
+harness=claude
+endpoint: alive (backend=tmux window=firstmate:fm-beta)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.noKoh8/home/state/beta.status)
+
+--- gamma ---
+window=firstmate:fm-gamma
+kind=ship
+harness=claude
+endpoint: alive (backend=tmux window=firstmate:fm-gamma)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.noKoh8/home/state/gamma.status)
+
+--- sm-far ---
+window=remote:sm-far
+endpoint_task_id=sm-far
+kind=secondmate
+harness=claude
+home=/srv/fm-sm-far
+remote_host=far-box
+remote_root=/srv/fm-sm-far
+endpoint: alive (backend=tmux window=remote:sm-far)
+status tail: (no status file yet: /var/folders/w2/2pkzk2kj219f76lv_2yv2md00000gn/T//fm-e2e-closed.noKoh8/home/state/sm-far.status)
+
+=== endpoint verdict lines:
+endpoint: alive (backend=tmux window=firstmate:fm-alpha)
+endpoint: alive (backend=tmux window=firstmate:fm-beta)
+endpoint: alive (backend=tmux window=firstmate:fm-gamma)
+endpoint: alive (backend=tmux window=remote:sm-far)

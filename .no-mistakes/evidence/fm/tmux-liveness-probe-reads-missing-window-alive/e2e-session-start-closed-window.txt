@@ -1,0 +1,46 @@
+### BASE ac6396c (before fix) (git archive ac6396c)
+real tmux windows in session firstmate: main fm-live-worker fm-closed-a-restarted 
+live worker pane: %1
+raw probe  tmux display-message -p -t firstmate:fm-closed-a #{window_name}/#{pane_id} -> fm-closed-a-restarted/%4 (exit 0)
+raw probe  tmux has-session -t firstmate:fm-closed-a -> (exit 0) 
+raw probe  tmux display-message -p -t firstmate:fm-closed-b #{window_name}/#{pane_id} -> main/%0 (exit 0)
+raw probe  tmux has-session -t firstmate:fm-closed-b -> can't find window: fm-closed-b (exit 1) 
+
+-- fm-session-start.sh run outside --
+--- task-closed-a ---
+endpoint: alive (backend=tmux window=firstmate:fm-closed-a)
+--- task-closed-b ---
+endpoint: alive (backend=tmux window=firstmate:fm-closed-b)
+--- task-live ---
+endpoint: alive (backend=tmux window=firstmate:fm-live-worker)
+
+-- fm-session-start.sh run inside tmux pane %5 --
+--- task-closed-a ---
+endpoint: alive (backend=tmux window=firstmate:fm-closed-a)
+--- task-closed-b ---
+endpoint: alive (backend=tmux window=firstmate:fm-closed-b)
+--- task-live ---
+endpoint: alive (backend=tmux window=firstmate:fm-live-worker)
+### TARGET 3d8e1e8 (after fix) (3d8e1e8)
+real tmux windows in session firstmate: main fm-live-worker fm-closed-a-restarted 
+live worker pane: %1
+raw probe  tmux display-message -p -t firstmate:fm-closed-a #{window_name}/#{pane_id} -> fm-closed-a-restarted/%4 (exit 0)
+raw probe  tmux has-session -t firstmate:fm-closed-a -> (exit 0) 
+raw probe  tmux display-message -p -t firstmate:fm-closed-b #{window_name}/#{pane_id} -> main/%0 (exit 0)
+raw probe  tmux has-session -t firstmate:fm-closed-b -> can't find window: fm-closed-b (exit 1) 
+
+-- fm-session-start.sh run outside --
+--- task-closed-a ---
+endpoint: dead (backend=tmux window=firstmate:fm-closed-a)
+--- task-closed-b ---
+endpoint: dead (backend=tmux window=firstmate:fm-closed-b)
+--- task-live ---
+endpoint: alive (backend=tmux window=firstmate:fm-live-worker)
+
+-- fm-session-start.sh run inside tmux pane %5 --
+--- task-closed-a ---
+endpoint: dead (backend=tmux window=firstmate:fm-closed-a)
+--- task-closed-b ---
+endpoint: dead (backend=tmux window=firstmate:fm-closed-b)
+--- task-live ---
+endpoint: alive (backend=tmux window=firstmate:fm-live-worker)
