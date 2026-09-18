@@ -1357,6 +1357,35 @@ EOF
   pass "tmux endpoint liveness is reported per task: alive for a live window, dead for a gone one"
 }
 
+test_endpoint_liveness_remote_secondmate() {
+  local rec root home fakebin out
+  rec=$(new_world liveness-remote)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  make_fake_tmux "$fakebin" "firstmate:main"
+  cat > "$fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+exit 255
+SH
+  chmod +x "$fakebin/ssh"
+
+  printf 'window=remote:sm-far\nendpoint_task_id=sm-far\nkind=secondmate\nharness=claude\nhome=/srv/fm-sm-far\nremote_host=far-box\nremote_root=/srv/fm-sm-far\n' \
+    > "$home/state/sm-far.meta"
+
+  out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  assert_contains "$out" "endpoint: remote (host=far-box), liveness not probed locally" \
+    "remote secondmate endpoint not reported as remote"
+  assert_not_contains "$out" "endpoint: dead (backend=tmux window=remote:sm-far)" \
+    "remote secondmate endpoint reported dead by the local tmux probe"
+  assert_not_contains "$out" "endpoint: alive (backend=tmux window=remote:sm-far)" \
+    "remote secondmate endpoint reported alive by the local tmux probe"
+
+  pass "a remote secondmate's endpoint is reported as remote, never judged alive or dead by the local tmux server"
+}
+
 test_endpoint_liveness_herdr() {
   local rec root home fakebin out
   rec=$(new_world liveness-herdr)
@@ -2703,6 +2732,7 @@ test_status_tail_bounding
 test_status_tail_line_cap
 test_orphan_status_logs_are_printed
 test_endpoint_liveness_tmux
+test_endpoint_liveness_remote_secondmate
 test_endpoint_liveness_herdr
 test_composition_invokes_real_scripts
 test_branch_outcome_replay_respects_captain_barrier_and_lease_sweep
