@@ -59,7 +59,7 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 
 # --- fake session provider --------------------------------------------------
 #
-# A tmux stub whose whole model is four files under $FM_FAKE_DIR:
+# A tmux stub whose whole model is five files under $FM_FAKE_DIR:
 #   command  the pane's foreground process name, which IS the agent-state
 #            classifier's input (bin/backends/tmux.sh).
 #   cwd      the pane's current path.
@@ -68,6 +68,8 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 #   keys     every named key send, one per line.
 #   pane     optional capture-pane override, for an adapter whose busy verdict
 #            is read from the rendered tail.
+#   windows  the live window names in session fmses, one per line, which the
+#            pane inventory lists for exact target resolution.
 # Two transitions make it a lifecycle model rather than a recorder: a literal
 # that is the harness's exit command flips `command` to a shell (the agent
 # stopped), and a literal carrying a launch brief flips it to the value in
@@ -130,6 +132,16 @@ case "${1:-}" in
     exit 0 ;;
   list-windows)
     if [ -f "$D/windows" ]; then cat "$D/windows"; fi
+    exit 0 ;;
+  list-panes)
+    n=0
+    if [ -f "$D/windows" ]; then
+      while IFS= read -r w; do
+        [ -n "$w" ] || continue
+        n=$((n + 1))
+        printf '%s:@%s:%%%s:1:fmses:%s\n' "$n" "$n" "$n" "$w"
+      done < "$D/windows"
+    fi
     exit 0 ;;
 esac
 exit 0

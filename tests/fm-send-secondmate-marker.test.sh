@@ -21,6 +21,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-marker-lib.sh"
 
@@ -41,6 +43,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   send-keys)
     shift
     literal=0
@@ -64,6 +67,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -192,7 +196,7 @@ test_explicit_window_is_not_marked() {
     || fail "explicit session:window send with meta: expected bare text, got marker"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)"
 
   home=$(setup_home explicit-no-meta)
-  run_send "$fb" "$home" "$log" "outside:window" "outside ping"; rc=$?
+  FM_FAKE_TMUX_INVENTORY=outside:window run_send "$fb" "$home" "$log" "outside:window" "outside ping"; rc=$?
   expect_code 0 "$rc" "send to an explicit window with no local meta should succeed"
   got=$(cat "$log")
   [ "$got" = "outside ping" ] \

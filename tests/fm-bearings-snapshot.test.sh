@@ -35,12 +35,29 @@ make_fakebin() {  # <dir>
 [ "${FAKE_NM_SLEEP:-0}" = 1 ] && sleep 30
 exit 0
 SH
+  # Every recorded window except a dead-* one is live: the pane inventory lists
+  # them in meta order as panes %1..%N, and a read of pane %N answers for the
+  # Nth recorded window.
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
+live_windows() {
+  sed -n 's/^window=//p' "${FM_HOME:?}"/state/*.meta 2>/dev/null | grep -v 'dead-'
+}
+args="$*"
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "-t" ]; then
+    case "$arg" in
+      %*) args="$args $(live_windows | sed -n "${arg#%}p")" ;;
+    esac
+  fi
+  prev=$arg
+done
 case "${1:-}" in
-  display-message) case "$*" in *dead-*) exit 1 ;; *) printf '%%1\n' ;; esac ;;
+  list-panes) live_windows | awk '{ printf "%d:@%d:%%%d:1:%s\n", NR, NR, NR, $0 }' ;;
+  display-message) case "$args" in *dead-*) exit 1 ;; *) printf '%%1\n' ;; esac ;;
   capture-pane)
-    case "$*" in
+    case "$args" in
       *fm-domain-alpha*) printf 'stale terminal summary: Phase 7 started\n> \n' ;;
       *) printf 'all quiet\n> \n' ;;
     esac
@@ -2996,7 +3013,7 @@ EOF
   printf 'working: old generation\n' > "$home/state/generation-race.status"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = display-message ]; then
+if [ "${1:-}" = list-panes ] || [ "${1:-}" = display-message ]; then
   if mkdir "$RACE_ONCE" 2>/dev/null; then
     tmp="$RACE_META.tmp.$$"
     cat > "$tmp" <<EOF
@@ -3013,7 +3030,9 @@ EOF
     mkdir -p "$(dirname "$RACE_REPORT")"
     printf 'replacement-only report\n' > "$RACE_REPORT"
   fi
-  # The old endpoint disappeared while a replacement reused the same target.
+  # The old endpoint disappeared while a replacement reused the same target:
+  # the pane inventory no longer lists it.
+  [ "${1:-}" = list-panes ] && exit 0
   exit 1
 fi
 exit 0

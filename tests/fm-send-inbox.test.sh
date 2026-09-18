@@ -29,6 +29,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-marker-lib.sh"
 
@@ -39,7 +41,8 @@ TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 
 # Stub tmux: logs literal typed text to FM_SEND_LOG and lets the submit and
 # composer paths reach clean verdicts. FM_FAKE_TMUX_COMPOSER=pending renders a
-# composer visibly holding text; FM_FAKE_TMUX_SEND_FAIL=1 fails send-keys.
+# composer visibly holding text; FM_FAKE_TMUX_SEND_FAIL=1 fails send-keys. Its
+# pane inventory (tests/fake-tmux-inventory.sh) lists every recorded window.
 make_stubs() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -47,6 +50,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   send-keys)
     [ "${FM_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
     shift
@@ -77,6 +81,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -213,7 +218,7 @@ test_harness_invocations_stay_typed() {
 test_explicit_target_stays_typed() {
   local dir err
   dir=$(setup_case explicit); err="$dir/send.err"
-  run_send "$dir" "$err" -- sess:win "hello there" || fail "an explicit-target send should succeed"
+  run_send "$dir" "$err" FM_FAKE_TMUX_INVENTORY=sess:win -- sess:win "hello there" || fail "an explicit-target send should succeed"
   assert_contains "$(cat "$dir/send.log")" "hello there" \
     "an explicit backend target should receive the literal text"
   [ -z "$(find "$dir/home/state" -maxdepth 1 -name '*.inbox' -print 2>/dev/null)" ] \

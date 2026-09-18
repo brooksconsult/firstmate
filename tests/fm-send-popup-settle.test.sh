@@ -45,6 +45,7 @@ TMP_ROOT=$(fm_test_tmproot fm-send-popup-settle)
 # Same stub shape as fm-send-settle.test.sh: a fake tmux that drives the submit
 # path to a clean "empty" verdict on the first Enter, and a fake sleep that records
 # every requested duration (one per line) into FM_SLEEP_LOG instead of sleeping.
+# The stub's pane inventory holds the one live window sess:win.
 make_stubs() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -52,6 +53,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) printf '0:@1:%%1:1:sess:win\n'; exit 0 ;;
   send-keys) exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done

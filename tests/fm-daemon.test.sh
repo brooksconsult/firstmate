@@ -1792,7 +1792,7 @@ test_pane_input_pending_detects_partial_input() {
   # Line 3 (cursor_y=2) has human's partial text (no Enter) → pending.
   printf 'line one\nline two\nhuman draft text\n' > "$capture"
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=2 \
-    pane_input_pending "fakepane" \
+    pane_input_pending "%1" \
     || fail "pane_input_pending should detect non-empty composer (human text)"
   pass "pane_input_pending detects partial input on the cursor line"
 }
@@ -1812,7 +1812,7 @@ test_pane_input_pending_blank_defers_strict() {
   capture="$dir/pane.txt"
   printf 'some output\nmore output\n\n' > "$capture"
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=2 \
-    pane_input_pending "fakepane" \
+    pane_input_pending "%1" \
     || fail "a blank unidentified cursor row must defer under the strict rule, not read empty"
   pass "pane_input_pending: a blank unidentified cursor row defers (strict container-proof rule)"
 }
@@ -1826,13 +1826,13 @@ test_pane_input_pending_requires_proven_empty_prompt() {
   for prompt in '$' '>'; do
     printf 'output\noutput\n%s \n' "$prompt" > "$capture"
     PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=2 \
-      pane_input_pending "fakepane" \
+      pane_input_pending "%1" \
       || fail "bare shell prompt '$prompt' should defer as unknown"
   done
   for prompt in '❯' '›'; do
     printf 'output\noutput\n%s \n' "$prompt" > "$capture"
     if PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=2 \
-      pane_input_pending "fakepane"; then
+      pane_input_pending "%1"; then
       fail "proven empty agent prompt '$prompt' should not defer"
     fi
   done
@@ -1851,7 +1851,7 @@ test_tmux_composer_state_bare_shell_is_unknown() {
   for g in '$' '%' '#' '>'; do
     printf 'output\noutput\n%s \n' "$g" > "$capture"
     out=$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=2 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = unknown ] \
       || fail "bare shell prompt '$g' must classify unknown (dead shell, unsafe), got '$out'"
   done
@@ -1867,15 +1867,15 @@ test_tmux_composer_state_bordered_and_agent_rows_are_empty() {
   fakebin="$dir/fakebin"; capture="$dir/pane.txt"
   printf '╭────────────────────────╮\n│ >                      │\n╰────────────────────────╯\n' > "$capture"
   out=$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = empty ] || fail "a bordered '│ > │' composer should read empty, got '$out'"
   printf '%s\n' "❯ " > "$capture"
   out=$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=0 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = empty ] || fail "a bare claude '❯' composer should read empty, got '$out'"
   printf '%s\n' "› " > "$capture"
   out=$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=0 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = empty ] || fail "a bare codex '›' composer should read empty, got '$out'"
   pass "fm_tmux_composer_state: a bordered composer box and bare agent glyphs (❯/›) still read empty"
 }
@@ -1887,7 +1887,7 @@ test_tmux_composer_state_requires_matching_box_borders() {
   for line in '| $ ' '$ |' '│ % ' '# ┃'; do
     printf '%s\n' "$line" > "$capture"
     out=$(PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=0 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" != empty ] \
       || fail "a decorated shell prompt '$line' must not read as an empty composer"
   done
@@ -1901,7 +1901,7 @@ test_pane_input_pending_preserves_bright_placeholder_like_draft() {
   capture="$dir/pane.txt"
   printf '╭────────────────╮\n│ custom idle>   │\n╰────────────────╯\n' > "$capture"
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=1 \
-    FM_COMPOSER_IDLE_RE='^custom idle>$' pane_input_pending "fakepane" \
+    FM_COMPOSER_IDLE_RE='^custom idle>$' pane_input_pending "%1" \
     || fail "bright placeholder-like input must remain pending in a styled capture"
   pass "pane_input_pending preserves bright placeholder-like drafts in styled captures"
 }
@@ -2014,7 +2014,7 @@ test_pane_input_pending_bordered_idle_not_pending() {
       '') printf '╭────────────╮\n│            │\n╰────────────╯\n' > "$capture" ;;
     esac
     if PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=1 \
-      pane_input_pending "fakepane"; then
+      pane_input_pending "%1"; then
       fail "bordered idle composer falsely detected as pending: <$line>"
     fi
   done
@@ -2030,7 +2030,7 @@ test_pane_input_pending_bordered_with_text_is_pending() {
   state="$dir/state"; fakebin="$dir/fakebin"; capture="$dir/pane.txt"
   printf '╭────────────────────────────────────────────────╮\n│ > fix findings 1 and 3, skip 2                 │\n╰────────────────────────────────────────────────╯\n' > "$capture"
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_FAKE_TMUX_CURSOR_Y=1 \
-    pane_input_pending "fakepane" \
+    pane_input_pending "%1" \
     || fail "real text inside a bordered composer was not detected as pending"
   pass "pane_input_pending: text inside a bordered composer is still pending"
 }
@@ -2043,7 +2043,7 @@ test_submit_ack_confirms_on_bordered_empty_composer() {
   dir=$(make_bordered_case ack-bordered)
   fakebin="$dir/fakebin"; sent="$dir/sent.log"; : > "$sent"
   verdict=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$dir/composer" FM_FAKE_SENT="$sent" \
-    fm_tmux_submit_core "win" "the digest" 3 0.05 0.05)
+    fm_tmux_submit_core "%1" "the digest" 3 0.05 0.05)
   [ "$verdict" = empty ] || fail "submit-ACK did not confirm on a bordered-empty composer: $verdict"
   [ "$(grep -cv '\[ENTER\]' "$sent")" -eq 1 ] || fail "digest typed more than once (retype)"
   [ "$(grep -c '\[ENTER\]' "$sent")" -eq 1 ] || fail "expected exactly one submitted Enter"
@@ -2060,7 +2060,7 @@ test_submit_ack_reports_pending_on_persistent_swallow() {
   touch "$dir/.swallow"
   verdict=$(PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$dir/composer" FM_FAKE_SENT="$sent" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
-    fm_tmux_submit_core "win" "the digest" 3 0.05 0.05)
+    fm_tmux_submit_core "%1" "the digest" 3 0.05 0.05)
   [ "$verdict" = pending ] || fail "persistent swallow not reported as pending: $verdict"
   [ "$(grep -cv '\[ENTER\]' "$sent")" -eq 1 ] || fail "digest retyped on swallow (expected type-once)"
   pass "submit-ACK reports pending on a persistently swallowed Enter (type-once)"
@@ -2512,18 +2512,19 @@ test_fm_send_reports_delivered_unconfirmed_submit() {
   # When typed-plane text was typed and Enter sent but the submit read-back
   # remains pending, fm-send must return its documented delivered-unconfirmed status and prevent
   # a duplicate resend reflex. A synchronously confirmed submit remains zero.
+  # The explicit target sess:win is declared live in the fake pane inventory.
   local dir fakebin err rc
   dir=$(make_bordered_case send-swallow)
   fakebin="$dir/fakebin"; err="$dir/send.err"
   # Clean submit -> exit 0.
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_INVENTORY=sess:win FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
     FM_SEND_SLEEP=0.05 "$ROOT/bin/fm-send.sh" sess:win 'route this work' >/dev/null 2>"$err" \
     || fail "fm-send exited non-zero on a clean submit: $(cat "$err")"
   # Persistent composer text after Enter -> delivered-unconfirmed exit 3 with
   # a non-error warning that explicitly tells the operator not to resend.
   printf '╭─────╮\n│ >   │\n╰─────╯\n' > "$dir/composer"
   touch "$dir/.swallow"
-  if PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
+  if PATH="$fakebin:$PATH" FM_FAKE_TMUX_INVENTORY=sess:win FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_SEND_SLEEP=0.05 \
     "$ROOT/bin/fm-send.sh" sess:win 'fix findings 1 and 3, skip 2' >/dev/null 2>"$err"; then
     rc=0
@@ -2545,7 +2546,7 @@ test_fm_send_exits_nonzero_on_initial_send_failure() {
   local dir fakebin err
   dir=$(make_bordered_case send-type-failure)
   fakebin="$dir/fakebin"; err="$dir/send.err"
-  if PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
+  if PATH="$fakebin:$PATH" FM_FAKE_TMUX_INVENTORY=sess:win FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
     FM_FAKE_SEND_FAIL=1 FM_SEND_SLEEP=0.05 \
     "$ROOT/bin/fm-send.sh" sess:win 'route this work' >/dev/null 2>"$err"; then
     fail "fm-send exited zero despite initial tmux send-keys failure"
@@ -2559,7 +2560,7 @@ test_fm_send_exits_nonzero_on_unproven_submit() {
   dir=$(make_bordered_case send-unproven)
   fakebin="$dir/fakebin"; err="$dir/send.err"
   touch "$dir/.swallow"
-  if PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
+  if PATH="$fakebin:$PATH" FM_FAKE_TMUX_INVENTORY=sess:win FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_COMPOSER="$dir/composer" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_SEND_SLEEP=0.05 \
     "$ROOT/bin/fm-send.sh" sess:win '修复' >/dev/null 2>"$err"; then
     fail "fm-send exited zero when submit proof remained pending-unproven"
@@ -2648,7 +2649,7 @@ test_pane_is_busy_defaults_to_tmux_when_backend_omitted() {
   dir=$(make_supercase busy-default-backend)
   fakebin="$dir/fakebin"; capture="$dir/pane.txt"
   printf 'Ctrl+c:cancel\n' > "$capture"
-  PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_STATE_OVERRIDE="$dir/state" FM_DAEMON_PRIMARY_HARNESS=grok pane_is_busy "fakepane" \
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$capture" FM_STATE_OVERRIDE="$dir/state" FM_DAEMON_PRIMARY_HARNESS=grok pane_is_busy "%1" \
     || fail "pane_is_busy with no backend arg should still default to tmux"
   pass "pane_is_busy: omitted backend defaults to tmux for Grok's isolated fallback"
 }

@@ -44,10 +44,19 @@ Verify setup by spawning a small task and confirming its `fm-<id>` window appear
 
 ## Current behavior and safety
 
+### Exact target resolution
+
+tmux's own `-t` lookup cannot answer whether a recorded window still exists.
+`display-message -t` naming a closed window exits 0 and answers from the session's current window, and a missing session, window id, or pane id reads empty with exit 0, whether or not the caller runs inside tmux.
+A window name that is a prefix of a live window's name resolves to that live window for every command, so a read or keystroke meant for `fm-foo` can land in `fm-foo-bar`.
+Every tmux probe, read, and send of a recorded target therefore first matches it exactly against the pane inventory - the exact session and exact window name, a window id, or a pane id - and then targets the matched pane's stable id.
+A closed window reads as absent everywhere, including the session-start fleet digest.
+`fm_tmux_resolve_pane` in `bin/fm-tmux-lib.sh` owns the accepted target forms and exit statuses.
+
 ### Agent liveness probe
 
 A target-existence check proves only that the pane exists.
-The deeper tmux agent-liveness probe first verifies exact window membership, then reads process names to distinguish a running harness from a bare idle shell.
+The deeper tmux agent-liveness probe first resolves the exact window, then reads process names to distinguish a running harness from a bare idle shell.
 It classifies recognized Claude, Codex, OpenCode, Pi, pi-signed, Grok, Kimi, Cursor, Muse, Rovo, and AGY process identities as `alive`, common shells as `dead`, an authoritatively absent window as `missing`, unreadable state as `unreadable`, and every other process as `ambiguous`.
 The process-name vocabulary behind those verdicts is owned by `bin/fm-agent-process-lib.sh` and shared with the Herdr adapter, which proves a registered agent against the same names ([herdr-backend.md](herdr-backend.md) "Restart and liveness behavior").
 Only `dead` and `missing` authorize recovery because a false dead result could launch a duplicate agent.

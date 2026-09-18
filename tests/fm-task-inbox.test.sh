@@ -54,7 +54,8 @@ inbox_lib() {  # <state> <function> [args...]
 # A fake tmux for the watcher cases: capture-pane replays FM_FAKE_TMUX_CAPTURE,
 # display-message yields a numeric cursor row, and every literal send-keys is
 # logged to FM_SEND_LOG so a doorbell ring is observable. With
-# FM_FAKE_TMUX_AGENT set, the inventory lists window fm-t1 and its
+# FM_FAKE_TMUX_AGENT set, the inventory lists window sess:fm-t1 (absent when
+# FM_FAKE_TMUX_MISSING=1) and its
 # #{pane_current_command} answers with that value, so `zsh` makes
 # fm_backend_tmux_agent_state read the pane as a dead bare shell.
 make_watch_stubs() {  # <dir> -> echoes fakebin dir
@@ -98,6 +99,7 @@ case "${1:-}" in
     fi
     exit 0 ;;
   list-windows) [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] || printf 'fm-t1\n'; exit 0 ;;
+  list-panes) [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] || printf '0:@1:%%1:1:sess:fm-t1\n'; exit 0 ;;
 esac
 exit 0
 SH

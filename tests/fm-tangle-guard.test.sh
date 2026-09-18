@@ -219,6 +219,10 @@ test_spawn_isolation_abort() {
 #     window id, never the (possibly-renamed) name - a lost name would let
 #     display-message fall back to the active client's window and misread firstmate's
 #     OWN pane as the worktree, tangling a hook into the primary checkout.
+# The fake's pane inventory lists the spawned window @41 (pane %42) under a
+# different name until the worktree wait loop has read its path, so a
+# treehouse-get or wait-loop step that targeted the name instead of the id
+# would find no window at all.
 make_spawn_record_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -226,12 +230,21 @@ make_spawn_record_fakebin() {
 #!/usr/bin/env bash
 set -u
 [ -n "${FM_TMUX_REC:-}" ] && printf 'tmux %s\n' "$*" >> "$FM_TMUX_REC"
+settled="$(dirname "$0")/.path-read"
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) : > "$settled"; printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
-  new-window) printf '%s\n' "@spawnwid"; exit 0 ;;
+  new-window) printf '%s\n' "@41"; exit 0 ;;
+  list-panes)
+    if [ -e "$settled" ]; then
+      printf '%s\n' '0:@41:%42:1:firstmate:fm-rec-win-gg7'
+    else
+      printf '%s\n' '0:@41:%42:1:firstmate:renamed-by-shell'
+    fi
+    exit 0
+    ;;
   list-windows) exit 0 ;;
   has-session|new-session|send-keys|set-window-option) exit 0 ;;
 esac
@@ -272,16 +285,18 @@ test_spawn_tmux_window_construction() {
     "new-window must not target the bare session name (collides under base-index 1)"
 
   # Bug 2 fix (a): pin the window name against automatic-rename / allow-rename.
-  assert_grep "set-window-option -t @spawnwid automatic-rename off" "$rec" \
+  assert_grep "set-window-option -t @41 automatic-rename off" "$rec" \
     "must disable automatic-rename on the spawned window"
-  assert_grep "set-window-option -t @spawnwid allow-rename off" "$rec" \
+  assert_grep "set-window-option -t @41 allow-rename off" "$rec" \
     "must disable allow-rename on the spawned window"
 
-  # Bug 2 fix (b): treehouse-get and the worktree wait loop target the stable id.
-  assert_grep "send-keys -t @spawnwid treehouse get Enter" "$rec" \
-    "treehouse get must be sent to the stable window id"
-  assert_grep "display-message -p -t @spawnwid #{pane_current_path}" "$rec" \
-    "the worktree wait loop must query the stable window id, not the name"
+  # Bug 2 fix (b): treehouse-get and the worktree wait loop target the stable
+  # id, resolved exactly to its pane; the fake hides the name until the wait
+  # loop has read the path, so a name-targeted step could not have succeeded.
+  assert_grep "send-keys -t %42 treehouse get Enter" "$rec" \
+    "treehouse get must be sent to the stable window id's pane"
+  assert_grep "display-message -p -t %42 #{pane_current_path}" "$rec" \
+    "the worktree wait loop must query the stable window id's pane, not the name"
 
   pass "fm-spawn: appends windows by session-colon, pins the name, and targets the window id"
 }

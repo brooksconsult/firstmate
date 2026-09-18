@@ -91,9 +91,19 @@ fm_test_fake_gh_axi() {
 
 # --- fake tmux / ssh / sleep ------------------------------------------------
 
+# fm_test_fake_tmux_inventory <fakebin>
+# Installs tests/fake-tmux-inventory.sh beside a fake tmux so the fake can
+# answer the exact-resolution `list-panes -a` read (and record `new-window`)
+# with a one-line delegation; that script's header owns the inventory model.
+fm_test_fake_tmux_inventory() {
+  cp "$ROOT/tests/fake-tmux-inventory.sh" "$1/fake-tmux-inventory.sh"
+  chmod +x "$1/fake-tmux-inventory.sh"
+}
+
 # fm_test_fake_tmux_spawn <fakebin>
 # Spawn-world tmux: pane_current_path from FM_FAKE_PANE_PATH, session named
-# firstmate, window ops succeed, send-keys succeed. When FM_FAKE_LAUNCH_LOG is
+# firstmate, window ops succeed, send-keys succeed. Created and recorded
+# windows are listed through tests/fake-tmux-inventory.sh. When FM_FAKE_LAUNCH_LOG is
 # set, each send-keys -l payload is appended one per line. Optional
 # FM_FAKE_DUPLICATE_WINDOW is printed from list-windows.
 #
@@ -102,6 +112,7 @@ fm_test_fake_gh_axi() {
 # suites that do not set FM_FAKE_LAUNCH_LOG keep a silent send-keys.
 fm_test_fake_tmux_spawn() {
   local fakebin=$1
+  fm_test_fake_tmux_inventory "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -116,7 +127,9 @@ case "${1:-}" in
     fi
     exit 0
     ;;
-  has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
+  has-session|new-session|kill-window|set-window-option) exit 0 ;;
   send-keys)
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
@@ -138,11 +151,13 @@ SH
 # fm_test_fake_tmux_send <fakebin>
 # Send-world tmux: logs send-keys -l payloads to FM_SEND_LOG, reports a numeric
 # cursor_y, and renders an empty bordered composer so the submit path reads
-# empty. Env knobs:
+# empty. Recorded windows are listed through tests/fake-tmux-inventory.sh.
+# Env knobs:
 #   FM_FAKE_TMUX_SEND_FAIL=1  send-keys exits 1
 #   FM_FAKE_TMUX_COMPOSER=pending  capture-pane shows leftover composer text
 fm_test_fake_tmux_send() {
   local fakebin=$1
+  fm_test_fake_tmux_inventory "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -179,6 +194,7 @@ case "${1:-}" in
     exit 0
     ;;
   list-windows) exit 0 ;;
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
 esac
 exit 0
 SH

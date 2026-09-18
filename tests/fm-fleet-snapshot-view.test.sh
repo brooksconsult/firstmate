@@ -19,6 +19,8 @@ make_fakebin() {  # <dir>
 #!/usr/bin/env bash
 exit 0
 SH
+  # Every recorded window is live: the pane inventory lists them in meta order
+  # as panes %1..%N, and a read of pane %N answers for the Nth recorded window.
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -28,9 +30,16 @@ for arg in "$@"; do
   if [ "$prev" = "-t" ]; then target=$arg; fi
   prev=$arg
 done
+case "$target" in
+  %*) target=$(sed -n 's/^window=//p' "${FM_HOME:?}"/state/*.meta | sed -n "${target#%}p") ;;
+esac
 case "${1:-}" in
   list-windows)
     sed -n 's/^window=[^:]*://p' "${FM_HOME:?}"/state/*.meta
+    ;;
+  list-panes)
+    sed -n 's/^window=//p' "${FM_HOME:?}"/state/*.meta \
+      | awk '{ printf "%d:@%d:%%%d:1:%s\n", NR, NR, NR, $0 }'
     ;;
   display-message)
     case "$*" in

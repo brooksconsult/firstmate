@@ -131,6 +131,38 @@ zsh
 A persistent parent shell waiting for a child remained reported as the parent process, while a shell that directly execed a simple command changed identity with the process itself.
 Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-spawn.sh` launches.
 
+### Exact target resolution
+
+Loose `-t` resolution was verified on 2026-09-17 with tmux 3.6b on macOS 26.6.2 arm64, on a private socket whose session `fmx` held windows `live` (index 0, current) and `other`, plus `fm-abc-long` for the prefix case.
+
+```sh
+tmux -L "$socket" display-message -p -t fmx:missing '#{session_name}:#{window_name} #{pane_id}'
+tmux -L "$socket" display-message -p -t '=fmx:=missing' '#{session_name}:#{window_name} #{pane_id}'
+tmux -L "$socket" display-message -p -t nosess:missing '#{pane_id}'
+tmux -L "$socket" display-message -p -t %999 '#{pane_id}'
+tmux -L "$socket" display-message -p -t fmx:fm-abc '#{window_name}'
+tmux -L "$socket" capture-pane -p -t fmx:missing -S -1
+tmux -L "$socket" capture-pane -p -t %999 -S -1
+```
+
+Observed exit status and output, identical from outside any client, from inside a detached pane of the same server, and from inside a pane with a client attached:
+
+```text
+0 fmx:live %0
+0 fmx:live %0
+0 (empty)
+0 (empty)
+0 fm-abc-long
+1 can't find window: missing
+1 can't find pane: %999
+```
+
+With a client attached and `other` current, both missing-window reads answered `fmx:other %1` instead, so the fallback follows the session's current window rather than the caller's own pane.
+`send-keys -t fmx:fm-abc` also succeeded against `fm-abc-long`, while `capture-pane`, `send-keys`, `has-session`, `list-panes`, `show-options -w`, and `set-window-option` all failed on the missing window.
+Separately, a client running outside tmux under the `C` locale rewrote the tab separators in a `list-panes -F` format to `_`, which is why the exact-match inventory uses colon separators.
+`tests/fm-backend-tmux-smoke.test.sh` pins the premise and the exact-match verdicts on every run, from outside a client and from inside a pane of its private server.
+The same run under tmux 3.4 on Ubuntu 24.04 (Docker) observed the identical premise, failed on the pre-fix probes, and passed on the exact-match resolver.
+
 ### Agent liveness name sources
 
 The earlier record that every harness is observed under its own `#{pane_current_command}` no longer holds and has been replaced by the per-harness evidence below.

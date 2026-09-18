@@ -169,5 +169,123 @@ state=$(fm_backend_agent_state tmux "$TARGET")
 fm_backend_tmux_kill "$TARGET" || fail "fm_backend_tmux_kill on an already-dead target must stay best-effort (never fail)"
 pass "real tmux: kill removes the window and the readable session inventory authoritatively classifies it missing"
 
+# --- missing-window probes never read the fallback pane ----------------------
+# tmux resolves `display-message -t` loosely: a target naming a window that does
+# not exist falls back to the session's current window and exits 0 (and a
+# missing session reads empty, still exit 0), while a name that is a prefix of a
+# live window resolves to that window for every command. Each recorded-target
+# probe must instead match the exact recorded window and read a closed one as
+# absent. The probes run twice - from outside any tmux client and from inside a
+# pane of the private server, where TMUX and TMUX_PANE are set by tmux itself -
+# because the fallback was first observed from inside a client; both contexts
+# assert the raw fallback first so neither case can pass vacuously.
+
+PROBE="$SHIM_DIR/probe-missing.sh"
+cat > "$PROBE" <<'SH'
+#!/usr/bin/env bash
+# Prints one key=value verdict per probe for the smoke test to assert.
+set -u
+root=$1 session=$2 gone=$3 prefix=$4 live=$5
+# shellcheck source=/dev/null
+. "$root/bin/fm-backend.sh"
+fm_backend_source tmux || { echo "source=failed"; exit 1; }
+verdict() { if "$@" >/dev/null 2>&1; then echo yes; else echo no; fi; }
+nonempty() { local out; out=$("$@" 2>/dev/null) || out=; [ -n "$out" ] && echo yes || echo no; }
+echo "context=${TMUX_PANE:-outside}"
+echo "raw_fallback=$(verdict tmux display-message -p -t "$session:$gone" '#{pane_id}')"
+echo "raw_prefix=$(tmux display-message -p -t "$session:$prefix" '#{window_name}' 2>/dev/null)"
+echo "exists_live=$(verdict fm_backend_target_exists tmux "$session:$live")"
+echo "exists_gone=$(verdict fm_backend_target_exists tmux "$session:$gone")"
+echo "exists_prefix=$(verdict fm_backend_target_exists tmux "$session:$prefix")"
+echo "exists_gone_session=$(verdict fm_backend_target_exists tmux "no-such-session-xyz:$live")"
+live_pane=$(tmux list-panes -t "=$session:=$live" -F '#{pane_id}' | head -1)
+live_window=$(tmux list-panes -t "=$session:=$live" -F '#{window_id}' | head -1)
+echo "exists_live_pane=$(verdict fm_backend_target_exists tmux "$live_pane")"
+echo "exists_live_window=$(verdict fm_backend_target_exists tmux "$live_window")"
+echo "exists_gone_pane=$(verdict fm_backend_target_exists tmux '%99999')"
+echo "exists_gone_window=$(verdict fm_backend_target_exists tmux '@99999')"
+echo "state_gone=$(fm_backend_agent_state tmux "$session:$gone")"
+echo "state_prefix=$(fm_backend_agent_state tmux "$session:$prefix")"
+echo "capture_gone=$(verdict fm_backend_tmux_capture "$session:$gone" 5)"
+echo "capture_prefix=$(verdict fm_backend_tmux_capture "$session:$prefix" 5)"
+echo "capture_live=$(verdict fm_backend_tmux_capture "$session:$live" 5)"
+echo "command_gone=$(nonempty fm_backend_tmux_current_command "$session:$gone")"
+echo "command_live=$(nonempty fm_backend_tmux_current_command "$session:$live")"
+echo "path_gone=$(nonempty fm_backend_tmux_current_path "$session:$gone")"
+echo "path_live=$(nonempty fm_backend_tmux_current_path "$session:$live")"
+echo "fg_gone=$(nonempty fm_backend_tmux_foreground_comms "$session:$gone")"
+echo "fg_live=$(nonempty fm_backend_tmux_foreground_comms "$session:$live")"
+echo "cursor_gone=$(nonempty fm_tmux_composer_cursor_row "$session:$gone")"
+echo "busy_gone=$(fm_pane_busy_state "$session:$gone")"
+echo "composer_gone=$(fm_tmux_composer_state "$session:$gone")"
+echo "key_gone=$(verdict fm_backend_tmux_send_key "$session:$gone" Escape)"
+echo "key_prefix=$(verdict fm_backend_tmux_send_key "$session:$prefix" Escape)"
+echo "literal_prefix=$(verdict fm_backend_tmux_send_literal "$session:$prefix" x)"
+echo "line_prefix=$(verdict fm_backend_tmux_send_text_line "$session:$prefix" x)"
+echo "submit_prefix=$(fm_tmux_submit_core "$session:$prefix" x 1 0 0)"
+SH
+chmod +x "$PROBE"
+
+GONE="fm-closed-worker"
+PREFIX="fm-smoke1"
+LIVE="fm-smoke1-sibling"
+tmux new-window -d -t "$SESSION:" -n "$LIVE" 'sleep 600' \
+  || fail "real tmux: could not create the live sibling window"
+tmux list-windows -t "=$SESSION" -F '#{window_name}' | grep -qx "$GONE" \
+  && fail "the missing-window fixture unexpectedly exists"
+tmux list-windows -t "=$SESSION" -F '#{window_name}' | grep -qx "$PREFIX" \
+  && fail "the prefix-window fixture unexpectedly exists"
+
+expect_probe() {  # <output> <key> <value> <context>
+  case $'\n'"$1"$'\n' in
+    *$'\n'"$2=$3"$'\n'*) : ;;
+    *) fail "real tmux ($4): expected $2=$3"$'\n'"$1" ;;
+  esac
+}
+
+assert_missing_probes() {  # <output> <context>
+  local out=$1 ctx=$2 key
+  # The premise: raw tmux really does resolve both loose targets to a live
+  # window here, so the exact probes below are what separates them.
+  expect_probe "$out" raw_fallback yes "$ctx"
+  expect_probe "$out" raw_prefix "$LIVE" "$ctx"
+  for key in exists_live exists_live_pane exists_live_window capture_live command_live path_live fg_live; do
+    expect_probe "$out" "$key" yes "$ctx"
+  done
+  for key in exists_gone exists_prefix exists_gone_session exists_gone_pane exists_gone_window \
+    capture_gone capture_prefix command_gone path_gone fg_gone cursor_gone \
+    key_gone key_prefix literal_prefix line_prefix; do
+    expect_probe "$out" "$key" no "$ctx"
+  done
+  expect_probe "$out" state_gone missing "$ctx"
+  expect_probe "$out" state_prefix missing "$ctx"
+  expect_probe "$out" busy_gone unknown "$ctx"
+  expect_probe "$out" composer_gone unknown "$ctx"
+  expect_probe "$out" submit_prefix send-failed "$ctx"
+}
+
+out=$(env -u TMUX -u TMUX_PANE "$PROBE" "$ROOT" "$SESSION" "$GONE" "$PREFIX" "$LIVE" 2>&1)
+expect_probe "$out" context outside "outside a client"
+assert_missing_probes "$out" "outside a client"
+pass "real tmux: from outside a client, every recorded-target probe reads a missing or prefix-only window as absent"
+
+INSIDE_OUT="$SHIM_DIR/probe-inside.out"
+INSIDE_RC="$SHIM_DIR/probe-inside.rc"
+tmux new-window -d -t "$SESSION:" -n fm-probe-runner \
+  "PATH='$PATH'; export PATH; '$PROBE' '$ROOT' '$SESSION' '$GONE' '$PREFIX' '$LIVE' > '$INSIDE_OUT' 2>&1; echo \$? > '$INSIDE_RC'; sleep 600" \
+  || fail "real tmux: could not start the in-pane probe"
+for _ in $(seq 1 200); do
+  [ -s "$INSIDE_RC" ] && break
+  sleep 0.1
+done
+[ -s "$INSIDE_RC" ] || fail "the in-pane probe did not finish"
+out=$(cat "$INSIDE_OUT")
+case $'\n'"$out" in
+  *$'\n'context=%*) : ;;
+  *) fail "the in-pane probe did not run inside a tmux pane"$'\n'"$out" ;;
+esac
+assert_missing_probes "$out" "inside a client pane"
+pass "real tmux: from inside a client pane, every recorded-target probe reads a missing or prefix-only window as absent"
+
 cleanup_all
 trap - EXIT

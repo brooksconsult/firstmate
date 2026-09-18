@@ -6,6 +6,8 @@
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 # fm-wake-drain.sh now calls fm-guard.sh to assert watcher liveness on every
 # drain. fm-guard.sh's first check warns when the firstmate PRIMARY checkout
@@ -61,6 +63,9 @@ make_case() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+if [ "${1:-}" = "list-panes" ]; then
+  exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")"
+fi
 if [ "${1:-}" = "list-windows" ]; then
   if [ -n "${FM_FAKE_TMUX_WINDOWS:-}" ]; then
     printf '%s\n' "$FM_FAKE_TMUX_WINDOWS"
@@ -100,6 +105,7 @@ fi
 exit 1
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   make_fake_crew_state "$fakebin" >/dev/null
   printf '%s\n' "$dir"
 }
@@ -164,6 +170,13 @@ make_supercase() {
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes)
+    # The supervisor pane (FM_SUPERVISOR_TARGET, else the daemon's firstmate:0
+    # default) and the housekeeping window FM_FAKE_TMUX_WINDOW are live with
+    # every recorded window unless FM_FAKE_TMUX_PANE_ALIVE=0.
+    [ "${FM_FAKE_TMUX_PANE_ALIVE:-1}" = "1" ] || exit 0
+    FM_FAKE_TMUX_INVENTORY="${FM_FAKE_TMUX_INVENTORY:-} ${FM_SUPERVISOR_TARGET:-firstmate:0} ${FM_FAKE_TMUX_WINDOW:-}" \
+      exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   display-message)
     [ "${FM_FAKE_TMUX_PANE_ALIVE:-1}" = "1" ] || exit 1
     _print=0
@@ -232,6 +245,7 @@ esac
 exit 1
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   printf '%s\n' "$dir"
 }
 
@@ -264,6 +278,9 @@ case "${1:-}" in
     exit 0 ;;
   capture-pane) cat "$COMPOSER" 2>/dev/null; exit 0 ;;
   list-windows) exit 0 ;;
+  list-panes)
+    FM_FAKE_TMUX_INVENTORY="${FM_FAKE_TMUX_INVENTORY:-} ${FM_SUPERVISOR_TARGET:-firstmate:0}" \
+      exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   send-keys)
     shift
     text=""; is_enter=0; lit=0
@@ -293,6 +310,7 @@ esac
 exit 1
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   printf '%s\n' "$dir"
 }
 

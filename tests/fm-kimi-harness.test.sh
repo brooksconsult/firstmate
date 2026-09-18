@@ -4,6 +4,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 # bin/fm-harness.sh answers from environment markers and process ancestry. A
 # suite run from inside Cursor, Claude, Pi, or Grok inherits those markers and
@@ -64,9 +66,11 @@ case "$*" in
   *"#{cursor_y}"*) fake_cursor_y; exit 0 ;;
 esac
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows) exit 0 ;;
-  has-session|new-session|new-window|kill-window) exit 0 ;;
+  has-session|new-session|kill-window) exit 0 ;;
   send-keys)
     prev=
     literal=
@@ -132,6 +136,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   fm_fake_exit0 "$fakebin" treehouse gh-axi gh
   fm_fake_exit0 "$fakebin" kimi
   ln -s "$JQ_BIN" "$fakebin/jq"
@@ -607,30 +612,30 @@ test_kimi_busy_signature_is_scoped_to_spinner_lines() {
   local phase
   for phase in 🌑 🌒 🌓 🌔 🌕 🌖 🌗 🌘; do
     printf '  %s · Tip: Kimi is working\n│ > │\n' "$phase" > "$capture"
-    fm_pane_is_busy fake kimi || fail "Kimi spinner phase $phase was not recognized as busy"
+    fm_pane_is_busy %1 kimi || fail "Kimi spinner phase $phase was not recognized as busy"
   done
   printf 'ordinary response ending with 🌕\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake kimi; then
+  if fm_pane_is_busy %1 kimi; then
     fail "a moon outside Kimi's spinner-line shape was misread as busy"
   fi
   printf '🌕 Full moon details\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake kimi; then
+  if fm_pane_is_busy %1 kimi; then
     fail "moon-led Kimi output without the middot separator was misread as busy"
   fi
   printf '  🌗 · Tip: /plugins: manage plugins ...\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake codex; then
+  if fm_pane_is_busy %1 codex; then
     fail "Kimi's real spinner signature leaked into another harness"
   fi
   printf 'tip: ctrl+c: cancel\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake kimi; then
+  if fm_pane_is_busy %1 kimi; then
     fail "kimi's independently rotating idle tip was misread as busy"
   fi
   printf 'Ctrl+c:cancel\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake kimi; then
+  if fm_pane_is_busy %1 kimi; then
     fail "Grok's exact busy token leaked into Kimi's harness-scoped matcher"
   fi
   printf 'auto  K2.7 Coding thinking  /some/path\n│ > │\n' > "$capture"
-  if fm_pane_is_busy fake kimi; then
+  if fm_pane_is_busy %1 kimi; then
     fail "Kimi's idle thinking-effort status label was misread as busy"
   fi
   pass "busy detection: real Kimi moon-plus-middot captures require its harness while idle labels stay idle"

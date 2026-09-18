@@ -455,6 +455,7 @@ test_secondmate_active_turn_defers_stall_until_the_turn_ends() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   list-windows) printf '%s\n' 'firstmate:fm-mate' ;;
   capture-pane) printf 'working\n' ;;
   display-message) printf '0\n' ;;
@@ -510,6 +511,7 @@ test_secondmate_stall_marker_rejects_symlink() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   list-windows) printf '%s\n' 'firstmate:fm-mate' ;;
   capture-pane) : ;;
   display-message) printf '0\n' ;;

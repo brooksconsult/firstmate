@@ -295,25 +295,19 @@ SH
   chmod +x "$fakebin/ps"
 }
 
-# make_fake_tmux <fakebin> <live-target>: display-message succeeds only for
-# the given "session:window" target - the exact primitive
-# fm_backend_target_exists uses for a tmux endpoint liveness read.
+# make_fake_tmux <fakebin> <live-target>: the pane inventory lists only the
+# given "session:window" target - the exact-match read fm_backend_target_exists
+# uses for a tmux endpoint liveness read - while display-message keeps real
+# tmux's loose fallback and answers for any target, so a missing window can
+# read alive only through that fallback.
 make_fake_tmux() {
   local fakebin=$1 live=$2
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
 case "\${1:-}" in
-  display-message)
-    target=""
-    prev=""
-    for a in "\$@"; do
-      [ "\$prev" = "-t" ] && target="\$a"
-      prev="\$a"
-    done
-    [ "\$target" = "$live" ] && { printf '%%1\n'; exit 0; }
-    exit 1
-    ;;
+  list-panes) printf '%s\\n' '0:@1:%1:1:$live'; exit 0 ;;
+  display-message) printf '%%1\n'; exit 0 ;;
 esac
 exit 1
 SH
@@ -323,7 +317,8 @@ SH
 # make_fake_tmux_secondmate_recovery <fakebin>: a stateful tmux boundary
 # fixture for the real session-start -> bootstrap -> spawn path.
 # FM_FAKE_TMUX_MODE selects missing, ambiguous, unreadable, or shell; missing
-# reproduces real tmux's active-window fallback while inventory omits the mate.
+# reproduces real tmux's active-window fallback while the pane inventory omits
+# the mate. The mate's window lives in session firstmate as pane %1.
 make_fake_tmux_secondmate_recovery() {
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
@@ -347,9 +342,11 @@ case "${1:-}" in
       case "$arg" in '#{'*) format=$arg ;; esac
     done
     if [ "${target#%}" != "$target" ]; then
+      command=node
+      [ -e "$spawned" ] || [ "$mode" != shell ] || command=zsh
       case "$format" in
         *pane_current_path*) printf '%s\n' "$mate_home" ;;
-        *pane_current_command*) printf '%s\n' node ;;
+        *pane_current_command*) printf '%s\n' "$command" ;;
         *) printf '%s\n' "$target" ;;
       esac
       exit 0
@@ -377,6 +374,19 @@ case "${1:-}" in
       unreadable) exit 1 ;;
     esac
     ;;
+  list-panes)
+    if [ "$mode" = unreadable ] && [ ! -e "$spawned" ] && [ ! -e "$killed" ]; then
+      printf '%s\n' 'permission denied' >&2
+      exit 1
+    fi
+    printf '%s\n' '0:@2:%2:1:firstmate:main'
+    if [ -e "$spawned" ]; then
+      printf '1:@1:%%1:1:firstmate:%s\n' "$mate_window"
+    elif [ ! -e "$killed" ] && { [ "$mode" = ambiguous ] || [ "$mode" = shell ]; }; then
+      printf '1:@1:%%1:1:firstmate:%s\n' "$mate_window"
+    fi
+    exit 0
+    ;;
   list-windows)
     if [ "$mode" = unreadable ] && [ ! -e "$spawned" ] && [ ! -e "$killed" ]; then
       exit 1
@@ -399,7 +409,7 @@ case "${1:-}" in
   new-window)
     printf '%s\n' "$*" >> "$log"
     : > "$spawned"
-    printf '%%1\n'
+    printf '@1\n'
     exit 0
     ;;
   set-window-option|send-keys) exit 0 ;;

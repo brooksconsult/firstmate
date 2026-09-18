@@ -31,6 +31,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 fm_git_identity fmtest fmtest@example.invalid
 
 # shellcheck source=/dev/null
@@ -645,6 +647,8 @@ test_backend_of_selector_matches_explicit_target_meta() {
 # --- old vs new: fm-send.sh --------------------------------------------------
 
 make_send_fakebin() {  # <dir> -> echoes fakebin dir; logs every tmux call to $FM_TMUX_LOG
+  # Its pane inventory holds sess:win as pane %7 and a prefix-sharing
+  # sess:win-sibling as pane %8, so a closed or prefix-only target is absent.
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/tmux" <<'SH'
@@ -656,6 +660,7 @@ case "${1:-}" in
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
+  list-panes) printf '0:@3:%%7:1:sess:win\n1:@4:%%8:1:sess:win-sibling\n'; exit 0 ;;
   capture-pane)
     start= end=
     while [ $# -gt 0 ]; do
@@ -688,12 +693,6 @@ run_send_case() {  # <bin-root> <fakebin> <log> <home> -- <send args...>
     "$bin/bin/fm-send.sh" "$@" >/dev/null 2>&1
 }
 
-strip_send_preflight() {  # <log>
-  local preflight
-  preflight=$'tmux\x1fdisplay-message\x1f-p\x1f-t\x1fsess:win\x1f#{pane_id}'
-  awk -v preflight="$preflight" '$0 != preflight { print }' "$1"
-}
-
 # The byte-identical old-vs-new tmux log comparison this test used to run
 # covered the P1 backend extraction, which promised an unchanged command
 # sequence. The composer consolidation (fm-composer-thin-adapter-refactor-r1)
@@ -707,21 +706,32 @@ test_send_tmux_contract() {
   home="$TMP_ROOT/send-home"; mkdir -p "$home/state"
   log="$TMP_ROOT/send-new.log"
 
-  # Case 1: --key path - target verified, named key sent, no typing.
+  # Case 1: --key path - target resolved exactly from the pane inventory, the
+  # named key sent to the resolved pane id, no typing.
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" --key Escape
   rc=$?
   expect_code 0 "$rc" "fm-send --key should succeed against a live fake pane"
-  assert_contains "$(cat "$log")" $'\x1f''display-message'$'\x1f''-p'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''#{pane_id}' \
-    "fm-send --key did not verify the explicit tmux target before sending"
-  assert_contains "$(cat "$log")" $'\x1f''Escape' "fm-send --key did not send the named key"
+  assert_contains "$(cat "$log")" $'\x1f''list-panes'$'\x1f''-a' \
+    "fm-send --key did not resolve the explicit tmux target from the pane inventory"
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''Escape' \
+    "fm-send --key did not send the named key to the exactly resolved pane"
   assert_not_contains "$(cat "$log")" $'\x1f''-l'$'\x1f' "fm-send --key must not type literal text"
+
+  # A closed window, and a name that is only a prefix of a live window, are
+  # refused before any key reaches a pane.
+  for gone in "sess:gone" "sess:win-sib"; do
+    run_send_case "$ROOT" "$fb" "$log" "$home" -- "$gone" --key Escape
+    rc=$?
+    [ "$rc" -ne 0 ] || fail "fm-send --key must refuse the absent tmux target $gone"
+    assert_not_contains "$(cat "$log")" $'\x1f''send-keys' "fm-send --key sent a key for the absent tmux target $gone"
+  done
 
   # Case 2: plain text - typed literally exactly once, submitted with Enter,
   # confirmed against the bordered-empty fake composer.
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" hello captain
   rc=$?
   expect_code 0 "$rc" "fm-send plain text should confirm against the empty fake composer"
-  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-l'$'\x1f''hello captain' \
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''-l'$'\x1f''hello captain' \
     "fm-send did not send the literal text with send-keys -l"
   [ "$(grep -c $'\x1f''-l'$'\x1f' "$log")" -eq 1 ] \
     || fail "fm-send must type the text exactly once (Enter-only retries, never a retype)"
@@ -733,12 +743,12 @@ test_send_tmux_contract() {
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" /some-skill
   rc=$?
   expect_code 0 "$rc" "fm-send /skill should confirm against the empty fake composer"
-  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-l'$'\x1f''/some-skill' \
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''-l'$'\x1f''/some-skill' \
     "fm-send /skill did not type the literal slash command"
   [ "$(grep -c $'\x1f''-l'$'\x1f' "$log")" -eq 1 ] \
     || fail "fm-send /skill must type the text exactly once"
 
-  pass "fm-send.sh: explicit tmux targets are verified; text types once and submits with Enter"
+  pass "fm-send.sh: explicit tmux targets resolve exactly or are refused; text types once and submits with Enter"
 }
 
 # --- old vs new: fm-peek.sh --------------------------------------------------
@@ -752,6 +762,7 @@ make_peek_fakebin() {  # <dir> <capture-output> -> echoes fakebin dir
 set -u
 { printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
 case "\${1:-}" in
+  list-panes) printf '0:@3:%%7:1:sess:win\\n' ;;
   capture-pane) cat "$dir/capture.out" ;;
 esac
 exit 0
@@ -781,12 +792,22 @@ test_peek_conformance_old_vs_new() {
 
   [ "$out_old" = "$out_new" ] || fail "fm-peek output differs old vs new"$'\n'"--- old ---"$'\n'"$out_old"$'\n'"--- new ---"$'\n'"$out_new"
   [ "$out_new" = "$payload" ] || fail "fm-peek did not pass through the fake capture-pane output exactly"
-  diff -u "$log_old" "$log_new" > "$TMP_ROOT/peek-diff.txt" 2>&1 \
-    || fail "fm-peek: tmux command log differs old vs new"$'\n'"$(cat "$TMP_ROOT/peek-diff.txt")"
-  assert_contains "$(cat "$log_new")" $'\x1f''capture-pane'$'\x1f''-p'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-S'$'\x1f''-25' \
-    "fm-peek did not call capture-pane -p -t <target> -S -<lines> exactly"
+  # The command sequence deliberately differs from the old script: the target
+  # is resolved exactly from the pane inventory and the capture reads the
+  # resolved pane id, so tmux can never answer from another window.
+  assert_contains "$(cat "$log_new")" $'\x1f''list-panes'$'\x1f''-a' \
+    "fm-peek did not resolve its target from the pane inventory"
+  assert_contains "$(cat "$log_new")" $'\x1f''capture-pane'$'\x1f''-p'$'\x1f''-t'$'\x1f''%7'$'\x1f''-S'$'\x1f''-25' \
+    "fm-peek did not call capture-pane -p -t <resolved-pane> -S -<lines> exactly"
 
-  pass "fm-peek.sh: capture-pane invocation and output are byte-identical old vs new"
+  : > "$log_new"
+  out_new=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral_root" FM_HOME="$home" FM_TMUX_LOG="$log_new" \
+    "$ROOT/bin/fm-peek.sh" "sess:gone" 25 2>/dev/null) \
+    && fail "fm-peek must fail for a closed tmux window"
+  [ -z "$out_new" ] || fail "fm-peek printed another pane's content for a closed tmux window"
+  assert_not_contains "$(cat "$log_new")" $'\x1f''capture-pane' "fm-peek captured a pane for a closed tmux window"
+
+  pass "fm-peek.sh: output matches the old script, the target resolves exactly, and a closed window captures nothing"
 }
 
 # --- old vs new: fm-spawn.sh --------------------------------------------------
@@ -803,10 +824,13 @@ case "\${1:-}" in
     for a in "\$@"; do case "\$a" in *pane_current_path*) printf '%s\\n' "$wt"; exit 0 ;; esac; done
     printf 'firstmate\\n'; exit 0 ;;
   list-windows) exit 0 ;;
+  list-panes) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" list "\$(dirname "\$0")" ;;
+  new-window) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" new-window "\$(dirname "\$0")" "\$@" ;;
 esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   fm_fake_exit0 "$fb" treehouse
   printf '%s\n' "$fb"
 }
@@ -873,10 +897,13 @@ case "\${1:-}" in
     ;; esac; done
     printf 'firstmate\\n'; exit 0 ;;
   list-windows) exit 0 ;;
+  list-panes) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" list "\$(dirname "\$0")" ;;
+  new-window) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" new-window "\$(dirname "\$0")" "\$@" ;;
 esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   fm_fake_exit0 "$fb" treehouse
   printf '%s\n' "$fb"
 }

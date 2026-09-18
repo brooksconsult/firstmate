@@ -40,7 +40,10 @@ trap 'rm -rf -- "$TMP_ROOT"' EXIT
 # and - when armed - the live mate ANSWERS a doorbell by doing what the persist
 # request asks and reporting it on the parent channel with the correlation token
 # the request carried. That answer is a real status append read by the real
-# pending-reply machinery, not a stubbed verdict.
+# pending-reply machinery, not a stubbed verdict. The live windows are the lines
+# of $FM_FAKE_DIR/windows in session fmses: the pane inventory lists line N as
+# pane %N, and per-window state stays keyed by the fmses:<name> target a pane
+# id stands for.
 make_stub() {  # <case-dir>
   local fb="$1/fakebin"
   mkdir -p "$fb"
@@ -48,14 +51,30 @@ make_stub() {  # <case-dir>
 #!/usr/bin/env bash
 set -u
 D=$FM_FAKE_DIR
+window_of() {  # <target> -> the fmses:<name> target a pane id stands for
+  case "$1" in
+    %*) printf 'fmses:%s' "$(sed -n "${1#%}p" "$D/windows" 2>/dev/null)" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
 case "${1:-}" in
+  list-panes)
+    n=0
+    if [ -f "$D/windows" ]; then
+      while IFS= read -r w; do
+        n=$((n + 1))
+        [ -n "$w" ] || continue
+        printf '%s:@%s:%%%s:1:fmses:%s\n' "$n" "$n" "$n" "$w"
+      done < "$D/windows"
+    fi
+    exit 0 ;;
   send-keys)
     shift
     literal=0
     target=
     while [ $# -gt 0 ]; do
       case "$1" in
-        -t) target=$2; shift 2 ;;
+        -t) target=$(window_of "$2"); shift 2 ;;
         -l) literal=1; shift ;;
         *) break ;;
       esac
@@ -98,7 +117,7 @@ case "${1:-}" in
     target=
     prev=
     for a in "$@"; do
-      if [ "$prev" = -t ]; then target=$a; fi
+      if [ "$prev" = -t ]; then target=$(window_of "$a"); fi
       case "$a" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*)

@@ -44,6 +44,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-classify-lib.sh"
 
@@ -104,8 +106,9 @@ SH
 #!/usr/bin/env bash
 set -u
 # FM_FAKE_TMUX_MISSING: the window is authoritatively gone - every addressed
-# call fails, but the session inventory still answers successfully and simply
-# omits the window, which is what proves absence.
+# call fails, but the pane inventory still answers successfully and simply
+# omits the window, which is what proves absence. Otherwise the inventory lists
+# every recorded window (tests/fake-tmux-inventory.sh).
 # FM_FAKE_TMUX_UNREADABLE: tmux itself cannot answer - it fails to execute (a
 # trimmed PATH) or errors non-definitively - so even the inventory fails, with
 # a message that is NOT one of the definitive no-session/no-server/no-socket
@@ -117,6 +120,9 @@ case "${1:-}" in
     # is proved by the answer rather than by an addressed call failing. Only
     # reached once display-message has already failed.
     ;;
+  list-panes)
+    [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 0
+    exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   display-message)
     [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
     printf '%%1\n' ;;
@@ -181,13 +187,14 @@ esac
 exit 0
 SH
   chmod +x "$fb/no-mistakes" "$fb/tmux" "$fb/herdr"
+  fm_test_fake_tmux_inventory "$fb"
   printf '%s\n' "$fb"
 }
 
 make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
   local dir=$1 tb="$1/notimeoutbin" tool real
   mkdir -p "$tb"
-  for tool in bash git grep sed head cut tail dirname perl; do
+  for tool in bash git grep sed head cut tail dirname perl awk; do
     real=$(command -v "$tool" || true)
     [ -n "$real" ] || fail "missing tool for no-timeout path: $tool"
     ln -s "$real" "$tb/$tool"

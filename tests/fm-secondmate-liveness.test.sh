@@ -43,8 +43,9 @@ TMP_ROOT=$(fm_test_tmproot fm-secondmate-liveness)
 # --- unit level: fm_backend_tmux_agent_state --------------------------------
 
 # make_probe_tmux <dir> <pane_current_command>: a fake tmux whose
-# #{pane_current_command} display-message query answers with the fixed value;
-# every other subcommand is a silent no-op success.
+# #{pane_current_command} display-message query answers with the fixed value
+# and whose pane inventory holds the one window sess:win; every other
+# subcommand is a silent no-op success.
 make_probe_tmux() {
   local dir=$1 comm=$2 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -55,7 +56,7 @@ case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_command*) printf '%s\n' '$comm'; exit 0 ;; esac; done
     exit 0 ;;
-  list-windows) printf '%s\n' win; exit 0 ;;
+  list-panes) printf '%s\n' '0:@1:%1:1:sess:win'; exit 0 ;;
 esac
 exit 0
 SH
@@ -65,7 +66,8 @@ SH
 
 # make_failed_probe_tmux <dir> <inventory>: missing and present fail the pane
 # read, while unreadable returns a misleading fallback node process but fails
-# the inventory that must be authoritative.
+# the inventory that must be authoritative. missing-session lists the target
+# window name only under another session, so the exact session match decides.
 make_failed_probe_tmux() {
   local dir=$1 inventory=$2 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -77,13 +79,13 @@ case "\${1:-}" in
     [ '$inventory' = unreadable ] && { printf '%s\n' node; exit 0; }
     exit 1
     ;;
-  list-windows)
+  list-panes)
     case '$inventory' in
-      missing) printf '%s\n' main ; exit 0 ;;
-      missing-session) printf '%s\n' "can't find session: sess" >&2; exit 1 ;;
+      missing) printf '%s\n' '0:@1:%1:1:sess:main' ; exit 0 ;;
+      missing-session) printf '%s\n' '0:@1:%1:1:sess2:fm-sm1' ; exit 0 ;;
       missing-server) printf '%s\n' "no server running on /tmp/tmux-test/default" >&2; exit 1 ;;
       missing-socket) printf '%s\n' "error connecting to /tmp/tmux-test/default (No such file or directory)" >&2; exit 1 ;;
-      present) printf '%s\n' fm-sm1 ; exit 0 ;;
+      present) printf '%s\n' '0:@1:%1:1:sess:fm-sm1' ; exit 0 ;;
       *) printf '%s\n' "permission denied" >&2; exit 1 ;;
     esac
     ;;
@@ -263,7 +265,8 @@ SH
 
 # make_liveness_tmux <dir>: a controllable tmux stub. FM_TEST_PANE_CMD may be
 # a foreground command, `missing` (readable inventory omits the window), or
-# `unreadable` (both pane and inventory reads fail).
+# `unreadable` (both pane and inventory reads fail). Its window lives in the
+# firstmate session, and a window it creates is listed from then on.
 make_liveness_tmux() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -293,11 +296,26 @@ case "${1:-}" in
       *) [ -e "${FM_TMUX_CALL_LOG:?}.killed" ] || printf '%s\n' fm-sm1; exit 0 ;;
     esac
     ;;
+  list-panes)
+    case "$mode" in
+      missing)
+        printf '%s\n' '0:@2:%2:1:firstmate:main'
+        [ ! -e "${FM_TMUX_CALL_LOG:?}.created" ] || printf '%s\n' '1:@1:%1:1:firstmate:fm-sm1'
+        exit 0
+        ;;
+      unreadable) exit 1 ;;
+      *) [ -e "${FM_TMUX_CALL_LOG:?}.killed" ] || printf '%s\n' '0:@1:%1:1:firstmate:fm-sm1'; exit 0 ;;
+    esac
+    ;;
   new-window|kill-window)
     printf '%s\n' "$*" >> "${FM_TMUX_CALL_LOG:?}"
     [ "${1:-}" = kill-window ] && : > "${FM_TMUX_CALL_LOG}.killed"
     [ "${FM_TEST_FAIL_NEW_WINDOW:-0}" = 1 ] && [ "${1:-}" = new-window ] && exit 1
-    [ "${1:-}" = new-window ] && rm -f "${FM_TMUX_CALL_LOG}.killed"
+    if [ "${1:-}" = new-window ]; then
+      rm -f "${FM_TMUX_CALL_LOG}.killed"
+      : > "${FM_TMUX_CALL_LOG}.created"
+      printf '%s\n' '@1'
+    fi
     exit 0
     ;;
   has-session) exit 0 ;;
