@@ -38,7 +38,8 @@ ESC=$(printf '\033')
 # with SGR sequences stripped WITHOUT -e (mirrors a plain capture). cursor_y comes
 # from FM_FAKE_CY. The fake deliberately returns the complete fixture for every
 # capture, which exercises the structural scan while preserving the historical
-# single-row fallback fixtures.
+# single-row fallback fixtures. Its pane inventory holds the one window sess:win
+# that the peek case targets by name.
 make_fake_tmux() {  # <dir>
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -49,6 +50,7 @@ case "${1:-}" in
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '%s\n' "${FM_FAKE_CY:-0}"; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
+  list-panes) printf '0:@1:%%1:1:sess:win\n'; exit 0 ;;
   capture-pane)
     has_e=0
     start= end= prev=
@@ -192,7 +194,7 @@ test_dim_ghost_only_composer_is_not_pending() {
   # The exact rendering claude emits: a normal prompt glyph + a DIM predicted prompt.
   printf '\xe2\x9d\xaf \033[2mWhat is the largest country by area?\033[0m\n' > "$capture"
   if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-     fm_pane_input_pending "fakepane"; then
+     fm_pane_input_pending "%1"; then
     fail "dim ghost-only composer falsely read as pending"
   fi
   pass "fm_pane_input_pending: a dim ghost-only composer is NOT pending"
@@ -206,7 +208,7 @@ test_dim_ghost_inside_bordered_composer_is_not_pending() {
   # Bordered composer (claude box) holding only dim ghost text.
   printf '╭─────────────────────────────────────╮\n│ \033[2mtry the other approach instead\033[0m      │\n╰─────────────────────────────────────╯\n' > "$capture"
   if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-     fm_pane_input_pending "fakepane"; then
+     fm_pane_input_pending "%1"; then
     fail "dim ghost in a bordered composer falsely read as pending"
   fi
   pass "fm_pane_input_pending: dim ghost inside a bordered composer is NOT pending"
@@ -220,7 +222,7 @@ test_normal_text_still_pending() {
   # Real human text, normal intensity - must still read as pending.
   printf '\xe2\x9d\xaf fix findings 1 and 3, skip 2\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "real typed text was not detected as pending"
   pass "fm_pane_input_pending: normal-intensity typed text is still pending"
 }
@@ -232,19 +234,19 @@ test_colored_text_with_2_payload_still_pending() {
   capture="$dir/styled.txt"
   printf '\xe2\x9d\xaf \033[38;5;2mgreen typed\033[0m\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "8-bit colored typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[38;2;224;222;244mtruecolor typed\033[0m\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "bright truecolor typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[58;5;2munderline-color typed\033[0m\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "underline-colored typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[58::5::2mcolon underline typed\033[0m\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "colon underline typed text was not detected as pending"
   pass "fm_pane_input_pending: bright colored text with 2 payloads is still pending"
 }
@@ -259,7 +261,7 @@ test_dark_truecolor_ghost_only_composer_is_not_pending() {
   # the same ANSI-aware owner as claude's dim ghost).
   printf '\xe2\x9d\xaf \033[38;2;50;47;70mType a message...\033[0m\n' > "$capture"
   if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-     fm_pane_input_pending "fakepane"; then
+     fm_pane_input_pending "%1"; then
     fail "dark truecolor ghost-only composer falsely read as pending"
   fi
   pass "fm_pane_input_pending: a dark truecolor ghost-only composer (grok placeholder) is NOT pending"
@@ -273,7 +275,7 @@ test_dark_truecolor_bare_shell_prompt_is_unknown() {
   for prompt in '$' 'user@host $'; do
     printf '\033[38;2;50;47;70m%s\033[0m\n' "$prompt" > "$capture"
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = unknown ] \
       || fail "dark truecolor bare shell prompt '$prompt' must read unknown, got '$out'"
   done
@@ -289,7 +291,7 @@ test_real_text_with_trailing_ghost_is_pending() {
   # text must win - the composer is pending.
   printf '\xe2\x9d\xaf deploy\033[2m the staging environment now\033[0m\n' > "$capture"
   PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_pane_input_pending "fakepane" \
+    fm_pane_input_pending "%1" \
     || fail "real text with a trailing ghost completion was not detected as pending"
   pass "fm_pane_input_pending: real text plus a trailing ghost run is still pending"
 }
@@ -308,7 +310,7 @@ test_two_row_composer_reads_text_above_empty_cursor_row() {
 ╰────────────────────────────────────────────────────╯
 EOF
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=2 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = pending ] \
     || fail "two-row composer text above the empty cursor row should be pending, got '$out'"
   pass "fm_tmux_composer_state: text above an empty cursor row is pending"
@@ -328,7 +330,7 @@ test_wrapped_composer_reads_all_content_rows() {
 ╰────────────────────────────────────────────╯
 EOF
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=4 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = pending ] \
     || fail "a three-row wrapped composer should be pending, got '$out'"
   pass "fm_tmux_composer_state: a message wrapped across three rows is pending"
@@ -341,7 +343,7 @@ test_proven_box_bottom_border_cursor_classifies_content() {
   capture="$dir/styled.txt"
   printf '╭────────────────────────╮\n│ ❯ \033[38;2;50;47;70mType a message...\033[0m    │\n╰──────── Grok 4.5 ──────╯\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=2 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = empty ] \
     || fail "a cursor on a proven titled box bottom must classify its content, got '$out'"
   pass "fm_tmux_composer_state: a proven titled box tolerates a bottom-border cursor"
@@ -364,7 +366,7 @@ test_pi_identity_requires_readable_busy_state() (
   }
   # shellcheck disable=SC2329 # Mock invoked indirectly by the sourced adapter.
   fm_pane_busy_state() { printf 'unknown'; }
-  if out=$(fm_tmux_composer_identity fakepane); then
+  if out=$(fm_tmux_composer_identity %1); then
     fail "a live Pi process with unreadable busy state must not produce identity, got '$out'"
   fi
   pass "fm_tmux_composer_identity: unknown busy state cannot become idle identity"
@@ -378,7 +380,7 @@ test_bordered_busy_signatures_are_pending() {
   for signature in 'Working...' 'Ctrl+c:cancel'; do
     printf '╭────────────────────╮\n│ %-18s │\n╰────────────────────╯\n' "$signature" > "$capture"
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = pending ] \
       || fail "typed bordered busy signature '$signature' should be pending, got '$out'"
   done
@@ -400,7 +402,7 @@ test_non_bordered_busy_footer_is_unknown_strict() {
   capture="$dir/styled.txt"
   printf 'Working...\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = unknown ] \
     || fail "a non-bordered busy footer must read unknown under the strict rule, got '$out'"
   pass "fm_tmux_composer_state: a bare busy-footer row reads unknown (strict container-proof rule)"
@@ -413,7 +415,7 @@ test_clipped_bordered_box_is_unknown() {
   capture="$dir/styled.txt"
   printf '╭────────────────────╮\n│ >                  │\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = unknown ] \
     || fail "a bordered box with no readable bottom border should be unknown, got '$out'"
   pass "fm_tmux_composer_state: an unbounded bordered box fails closed as unknown"
@@ -427,7 +429,7 @@ test_asymmetric_composer_edges_are_unknown() {
   for row in '│ > text' 'text │' '│ > text ┃' '──────' '+----' 'text +'; do
     printf '%s\n' "$row" > "$capture"
     out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = unknown ] \
       || fail "unbounded composer-edge row '$row' should be unknown, got '$out'"
   done
@@ -441,7 +443,7 @@ test_mismatched_box_families_are_unknown() {
   capture="$dir/styled.txt"
   printf '╭────────╮\n┃ >      ┃\n╰────────╯\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = unknown ] \
     || fail "a box with mismatched border families should be unknown, got '$out'"
   pass "fm_tmux_composer_state: inconsistent box geometry fails closed"
@@ -458,7 +460,7 @@ test_misaligned_box_is_unknown() {
       width) printf '╭────╮\n│     │\n╰────╯\n' > "$capture" ;;
     esac
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = unknown ] \
       || fail "a box with inconsistent $fixture geometry should be unknown, got '$out'"
   done
@@ -476,19 +478,19 @@ test_unproved_empty_geometry_fails_closed() {
         expected=unknown
         printf '╭────────────╮\n│ \033[2mghost\033[0m │\n╰────────────╯\n' > "$capture"
         out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-          fm_tmux_composer_state "fakepane")
+          fm_tmux_composer_state "%1")
         ;;
       idle)
         expected=pending-unproven
         printf '╭────────────╮\n│ idle hint │\n╰────────────╯\n' > "$capture"
         out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-          FM_COMPOSER_IDLE_RE='^idle hint$' fm_tmux_composer_state "fakepane")
+          FM_COMPOSER_IDLE_RE='^idle hint$' fm_tmux_composer_state "%1")
         ;;
       malformed-top)
         expected=unknown
         printf '╭────x───────╮\n│            │\n╰────────────╯\n' > "$capture"
         out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-          fm_tmux_composer_state "fakepane")
+          fm_tmux_composer_state "%1")
         ;;
     esac
     [ "$out" = "$expected" ] \
@@ -504,12 +506,12 @@ test_differing_widths_use_asymmetric_verdicts() {
   capture="$dir/styled.txt"
   printf '╭──────────╮\n│ > text │\n╰──────────╯\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = pending-unproven ] \
     || fail "text in a differing-width box should be pending-unproven, got '$out'"
   printf '╭──────────╮\n│        │\n╰──────────╯\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = unknown ] \
     || fail "an empty differing-width box should be unknown, never empty, got '$out'"
   pass "fm_tmux_composer_state: differing widths prefer pending or unknown, never empty"
@@ -523,7 +525,7 @@ test_wide_composer_text_is_pending() {
   for text in '修复登录问题' 'fix the bug 🔧'; do
     printf '╭────────────────────╮\n│ > %s │\n╰────────────────────╯\n' "$text" > "$capture"
     out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = pending-unproven ] \
       || fail "wide composer text '$text' should be pending-unproven, got '$out'"
   done
@@ -544,7 +546,7 @@ test_all_tmux_harness_composers_share_classification() {
       grok) printf '╭────────────╮\n│ ❯ \033[38;2;50;47;70mType\033[0m     │\n╰────────────╯\n' > "$capture" ;;
     esac
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = empty ] \
       || fail "$harness aligned idle composer should be empty, got '$out'"
     case "$harness" in
@@ -553,7 +555,7 @@ test_all_tmux_harness_composers_share_classification() {
       opencode|pi|pi-signed) printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$capture" ;;
     esac
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = pending ] \
       || fail "$harness composer with text should be pending, got '$out'"
   done
@@ -564,7 +566,7 @@ test_unrecognized_state_defers_input_guard() {
   (
     # shellcheck disable=SC2329
     fm_tmux_composer_state() { printf 'future-state'; }
-    fm_pane_input_pending "fakepane"
+    fm_pane_input_pending "%1"
   ) || fail "an unrecognized composer state should defer the input guard"
   pass "fm_pane_input_pending: unrecognized states defer by default"
 }
@@ -585,7 +587,7 @@ test_single_capture_leaves_no_fallback_race() {
   printf '› deploy staging\n' > "$capture"
   printf '│ > │\n' > "$row_capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_ROW="$row_capture" FM_FAKE_CY=0 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = pending ] \
     || fail "the verdict must come from the one full capture (agent glyph + typed text = pending), got '$out'"
   pass "fm_tmux_composer_state: one capture feeds the classifier; no band-capture race remains"
@@ -599,7 +601,7 @@ test_absent_tmux_identity_keeps_enclosed_bare_verdict() {
   nbsp=$(printf '\302\240')
   printf '────────────────────────\n❯%s\n────────────────────────\n' "$nbsp" > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = empty ] \
     || fail "an enclosed Claude glyph must keep its bare empty verdict when the Pi-only probe is absent, got '$out'"
   pass "fm_tmux_composer_state: absent Pi identity preserves Claude's enclosed bare verdict"
@@ -620,7 +622,7 @@ test_legitimate_empty_routes_remain_empty() {
       agent-prompt) printf '›\n' > "$capture"; cursor=0 ;;
     esac
     out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY="$cursor" \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = empty ] \
       || fail "legitimate empty route '$fixture' should remain empty, got '$out'"
   done
@@ -634,7 +636,7 @@ test_non_bordered_composer_uses_compatibility_fallback() {
   capture="$dir/styled.txt"
   printf '› deploy staging\n' > "$capture"
   out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-    fm_tmux_composer_state "fakepane")
+    fm_tmux_composer_state "%1")
   [ "$out" = pending ] \
     || fail "a non-bordered composer should retain cursor-row classification, got '$out'"
   pass "fm_tmux_composer_state: panes without bordered structure retain compatibility fallback"
@@ -648,7 +650,7 @@ test_non_bordered_interior_edges_are_pending() {
   for row in '› cat file | grep x' '› explain │ this glyph'; do
     printf '%s\n' "$row" > "$capture"
     out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
-      fm_tmux_composer_state "fakepane")
+      fm_tmux_composer_state "%1")
     [ "$out" = pending ] \
       || fail "non-bordered interior edge row '$row' should be pending, got '$out'"
   done

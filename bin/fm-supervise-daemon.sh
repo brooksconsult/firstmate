@@ -157,10 +157,11 @@ FM_DAEMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_DAEMON_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
-# Shared tmux pane primitives for supervisor injection (busy/composer detection
-# + verify-retry submit). Sourced at top level so BOTH the executed daemon and
-# the unit tests (which source this file for its pure functions) get the
-# corrected composer detection. Stale task rechecks use fm-backend.sh below.
+# Shared tmux pane primitives for supervisor injection (exact target resolution,
+# busy/composer detection + verify-retry submit). Sourced at top level so BOTH
+# the executed daemon and the unit tests (which source this file for its pure
+# functions) get the corrected composer detection. Stale task rechecks use
+# fm-backend.sh below.
 # shellcheck source=bin/fm-tmux-lib.sh
 . "$FM_DAEMON_DIR/fm-tmux-lib.sh"
 
@@ -954,7 +955,7 @@ wedge_alarm_notify() {  # <summary> <marker>
 # is lost - the buffer and the
 # wake-queue both survive - but the stall stops being invisible.
 inject_wedge_alarm() {  # <state> <age-seconds>
-  local state=$1 age=$2 marker target backend max_defer now notify=1
+  local state=$1 age=$2 marker target backend pane max_defer now notify=1
   marker="$state/.subsuper-inject-wedged"
   max_defer="${FM_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}"
   # Re-alarm at most once per max-defer window so a long wedge does not spam.
@@ -979,8 +980,10 @@ inject_wedge_alarm() {  # <state> <age-seconds>
   # with no herdr equivalent; the log line + durable marker above are already
   # the primary, backend-independent signal, so a non-tmux backend just skips
   # this cosmetic extra rather than attempting an unsupported call.
-  if [ "$backend" = tmux ]; then
-    tmux display-message -t "$target" "fm: away-mode escalations WEDGED ${age}s — see $marker" 2>/dev/null || true
+  # The flash goes only to the exactly resolved supervisor pane; tmux would
+  # otherwise answer a closed one from another window.
+  if [ "$backend" = tmux ] && pane=$(fm_tmux_resolve_pane "$target"); then
+    tmux display-message -t "$pane" "fm: away-mode escalations WEDGED ${age}s — see $marker" 2>/dev/null || true
   fi
   # Backend-independent active alert. Unlike the tmux flash above (skipped on
   # every non-tmux backend), this can reach the captain even when every pane and

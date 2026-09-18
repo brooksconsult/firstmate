@@ -1918,12 +1918,17 @@ $dir_pids"
 }
 
 reap_task_backend_process_group() {  # <label>
-  local label=$1 leader leader_start pgid current_pgid own_pgid
+  local label=$1 pane leader leader_start pgid current_pgid own_pgid
   if [ "$BACKEND" != tmux ]; then
     echo "warning: lsof is unavailable; cannot resolve a process-group fallback for $BACKEND task $ID" >&2
     return 0
   fi
-  leader=$(tmux display-message -p -t "$T" '#{pane_pid}' 2>/dev/null) || leader=""
+  # Resolve the recorded window exactly: tmux answers a closed window from the
+  # session's current one, whose process group is not this task's to signal.
+  leader=""
+  if fm_backend_source tmux && pane=$(fm_tmux_resolve_pane "$T"); then
+    leader=$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null) || leader=""
+  fi
   case "$leader" in ''|*[!0-9]*)
     echo "warning: lsof is unavailable; cannot resolve the tmux pane process group for $ID" >&2
     return 0

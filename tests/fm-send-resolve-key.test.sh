@@ -34,6 +34,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-marker-lib.sh"
 
@@ -53,6 +55,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   send-keys)
     [ "${FM_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
     shift
@@ -79,6 +82,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -522,8 +526,10 @@ test_flag_misuse_refuses() {
   [ "$rc" -ne 0 ] || fail "an empty answer message should refuse"
   assert_contains "$(cat "$err")" "nonempty answer message" "the empty-message refusal should be explicit"
 
-  # An explicit backend target has no task ledger in this home.
+  # An explicit backend target has no task ledger in this home, even when its
+  # window is live.
   env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_FAKE_TMUX_INVENTORY=sess:elsewhere \
     "$SEND" sess:elsewhere --resolve-key k "answer" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "an explicit backend target should refuse --resolve-key"
   assert_contains "$(cat "$err")" "no decision ledger" "the explicit-target refusal should be explicit"

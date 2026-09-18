@@ -1209,13 +1209,13 @@ legacy_meta_gen_count() {
 }
 
 # Override fakebin/tmux so the recovery-grade classifier reads the endpoint as
-# unreadable (a session inventory failure it cannot attribute), never dead.
+# unreadable (a pane inventory failure it cannot attribute), never dead.
 add_unreadable_tmux() {
   local case_dir=$1
   cat > "$case_dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  list-windows) echo "error connecting to fixture: permission denied" >&2 ; exit 1 ;;
+  list-windows|list-panes) echo "error connecting to fixture: permission denied" >&2 ; exit 1 ;;
 esac
 exit 0
 SH
@@ -3348,9 +3348,13 @@ test_lsof_absent_reaps_tmux_process_group() {
   disown
   sleep 0.3
   kill -0 "$pid" 2>/dev/null || fail "lsof-absent-process-group-reap: setup sleeper did not start"
+  # The task window is still live when teardown reaps, as pane %1.
   cat > "$case_dir/fakebin/tmux" <<EOF
 #!/usr/bin/env bash
-if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
+if [ "\${1:-}" = list-panes ]; then
+  printf '%s\n' '0:@1:%1:1:firstmate:fm-task-x1'
+fi
+if [ "\${1:-}" = display-message ] && [ "\$4" = '%1' ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
   printf '%s\n' '$pid'
 fi
 exit 0
@@ -3369,6 +3373,45 @@ EOF
   assert_grep "reaping leaked worktree process group" "$case_dir/stderr" \
     "lsof-absent-process-group-reap: teardown did not use the process-group fallback"
   pass "missing lsof falls back to reaping the tmux pane process group"
+}
+
+# tmux answers a pane read for a closed window from the session's current
+# window, so a closed task window must never lead the no-lsof fallback to
+# another pane's process group. The fake answers every pane_pid read with a
+# decoy's pid, as that fallback would, while its pane inventory omits the task.
+test_lsof_absent_skips_a_closed_tmux_window() {
+  local case_dir rc decoy path_without_lsof
+  case_dir=$(make_case lsof-absent-closed-window)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  path_without_lsof=$(make_path_without_lsof "$case_dir")
+
+  perl -e 'setpgrp(0, 0); chdir shift or die; exec "sleep", "300"' "$case_dir" &
+  decoy=$!
+  disown
+  sleep 0.3
+  kill -0 "$decoy" 2>/dev/null || fail "lsof-absent-closed-window: setup decoy did not start"
+  cat > "$case_dir/fakebin/tmux" <<EOF
+#!/usr/bin/env bash
+if [ "\${1:-}" = display-message ] && [ "\${*: -1}" = '#{pane_pid}' ]; then
+  printf '%s\n' '$decoy'
+fi
+exit 0
+EOF
+  chmod +x "$case_dir/fakebin/tmux"
+
+  rc=0
+  FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "lsof-absent-closed-window: teardown should succeed"
+  if ! kill -0 "$decoy" 2>/dev/null; then
+    fail "lsof-absent-closed-window: teardown signalled another pane's process group for a closed window"
+  fi
+  kill -KILL "$decoy" 2>/dev/null || true
+  assert_no_grep "reaping leaked worktree process group" "$case_dir/stderr" \
+    "lsof-absent-closed-window: teardown reaped a process group for a closed window"
+  pass "missing lsof never reaps another pane's process group for a closed tmux window"
 }
 
 test_lsof_error_refuses_before_removal() {
@@ -3743,6 +3786,7 @@ test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_lsof_absent_reaps_tmux_process_group
+test_lsof_absent_skips_a_closed_tmux_window
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
 test_exec_changed_process_is_still_reaped

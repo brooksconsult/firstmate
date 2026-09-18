@@ -851,6 +851,7 @@ case "${1:-}" in
     ;;
   capture-pane) printf '❯\n' ;;
   list-windows) printf '%s\n' fm-sm ;;
+  list-panes) printf '%s\n' '0:@1:%1:1:firstmate:fm-sm' ;;
 esac
 exit 0
 SH

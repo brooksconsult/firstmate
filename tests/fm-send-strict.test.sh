@@ -10,17 +10,31 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 SEND="$ROOT/bin/fm-send.sh"
 TMP_ROOT=$(fm_test_tmproot fm-send-strict)
 
+# The fake's pane inventory (tests/fake-tmux-inventory.sh) lists every recorded
+# window, so a target outside it is a closed window. send-keys logs the
+# session:window its pane id belongs to, and a target that was not an exactly
+# resolved pane id as raw:<target>.
 make_stubs() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+inventory="$(dirname "$0")/fake-tmux-inventory.sh"
+window_of() {  # <target>
+  case "$1" in
+    %*) "$inventory" list "$(dirname "$0")" | awk -F: -v p="$1" '$3 == p { print substr($0, length($1) + length($2) + length($3) + length($4) + 5); exit }' ;;
+    *) printf 'raw:%s' "$1" ;;
+  esac
+}
 case "${1:-}" in
+  list-panes) exec "$inventory" list "$(dirname "$0")" ;;
   send-keys)
     shift
     literal=0
@@ -32,7 +46,7 @@ case "${1:-}" in
         *) break ;;
       esac
     done
-    printf 'send-keys target=%s literal=%s arg=%s\n' "$target" "$literal" "${1:-}" >> "$FM_TMUX_LOG"
+    printf 'send-keys target=%s literal=%s arg=%s\n' "$(window_of "$target")" "$literal" "${1:-}" >> "$FM_TMUX_LOG"
     # FM_FAKE_TMUX_SEND_KEY_FAIL names one key whose delivery fails, so the
     # --key exit contract can be driven both ways from the same stub.
     if [ "$literal" = 0 ] && [ -n "${FM_FAKE_TMUX_SEND_KEY_FAIL:-}" ] \
@@ -50,9 +64,8 @@ case "${1:-}" in
         *) shift ;;
       esac
     done
-    if [ -n "${FM_FAKE_TMUX_DEAD_TARGET:-}" ] && [ "$target" = "$FM_FAKE_TMUX_DEAD_TARGET" ]; then
-      exit 1
-    fi
+    # Like real tmux, any target answers here, even a closed window; only the
+    # pane inventory decides whether a target exists.
     [ "$cursor" = 1 ] && { printf '1\n'; exit 0; }
     printf '%%1\n'
     exit 0 ;;
@@ -66,6 +79,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -159,7 +173,7 @@ test_unmatched_single_colon_target_must_exist() {
   dir="$TMP_ROOT/dead-explicit"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); home=$(setup_home deadexplicit); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
 
-  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_FAKE_TMUX_DEAD_TARGET=sess:missing FM_SEND_SETTLE=0 \
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
     "$SEND" sess:missing "hello" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "dead explicit tmux-shaped target should fail"
   assert_contains "$(cat "$err")" "not a live tmux endpoint" "dead explicit target diagnostic should name the assumed backend"

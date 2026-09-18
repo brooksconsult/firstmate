@@ -43,6 +43,7 @@ TMP_ROOT=$(fm_test_tmproot fm-send-agy-confirm)
 # shows the idle screen until its BUSY_AT-th call and the verified `esc to
 # cancel` busy row from then on. The BUSY_AT threshold is read from the
 # per-case dir so cases are independent.
+# The stub's pane inventory holds the one live window sess:win.
 make_stubs() {  # <dir> <busy-at> -> echoes fakebin dir
   local dir=$1 busy_at=$2 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -51,6 +52,7 @@ make_stubs() {  # <dir> <busy-at> -> echoes fakebin dir
 set -u
 cnt_file="$dir/plain.count"
 case "\${1:-}" in
+  list-panes) printf '0:@1:%%1:1:sess:win\\n'; exit 0 ;;
   send-keys) exit 0 ;;
   display-message)
     for a in "\$@"; do

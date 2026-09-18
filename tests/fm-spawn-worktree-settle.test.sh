@@ -53,14 +53,17 @@ case "$*" in
     ;;
 esac
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows) exit 0 ;;
-  has-session|new-session|new-window|kill-window) exit 0 ;;
+  has-session|new-session|kill-window) exit 0 ;;
   send-keys) exit 0 ;;
 esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   fm_fake_exit0 "$fakebin" treehouse
   printf '%s\n' "$fakebin"
 }

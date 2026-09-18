@@ -183,14 +183,25 @@ test_spawn_refuses_and_admits() {
 
 # A fake tmux that logs send-keys to FM_TMUX_LOG and reports live endpoints
 # (mirrors tests/fm-send-strict), so a successful send is observable and a
-# refused one leaves an empty log (proving no message was typed).
+# refused one leaves an empty log (proving no message was typed). Its pane
+# inventory (tests/fake-tmux-inventory.sh) lists every recorded window, and
+# send-keys logs the session:window its resolved pane id belongs to, or
+# raw:<target> for a target that was not an exactly resolved pane id.
 make_send_fakebin() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
+inventory="$(dirname "$0")/fake-tmux-inventory.sh"
+window_of() {  # <target>
+  case "$1" in
+    %*) "$inventory" list "$(dirname "$0")" | awk -F: -v p="$1" '$3 == p { print substr($0, length($1) + length($2) + length($3) + length($4) + 5); exit }' ;;
+    *) printf 'raw:%s' "$1" ;;
+  esac
+}
 case "${1:-}" in
+  list-panes) exec "$inventory" list "$(dirname "$0")" ;;
   send-keys)
     shift; literal=0; target=
     while [ $# -gt 0 ]; do
@@ -200,7 +211,7 @@ case "${1:-}" in
         *) break ;;
       esac
     done
-    printf 'send-keys target=%s literal=%s arg=%s\n' "$target" "$literal" "${1:-}" >> "$FM_TMUX_LOG"
+    printf 'send-keys target=%s literal=%s arg=%s\n' "$(window_of "$target")" "$literal" "${1:-}" >> "$FM_TMUX_LOG"
     exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
@@ -211,6 +222,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$fakebin/sleep"
   chmod +x "$fakebin/sleep"
   printf '%s\n' "$fakebin"

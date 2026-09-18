@@ -63,6 +63,7 @@ case "$*" in
   *display-message*'#{pane_id}'*) printf '%s\n' '%1' ;;
   *display-message*'#{cursor_y}'*) printf '%s\n' 0 ;;
   *list-windows*) printf '%s\n' fm-sm ;;
+  *list-panes*) printf '%s\n' '0:@1:%1:1:firstmate:fm-sm' ;;
   *capture-pane*) printf '❯\n' ;;
 esac
 exit 0

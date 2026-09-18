@@ -9,9 +9,13 @@
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 # A fake tmux (window ops are logged to FM_FAKE_TMUX_LOG, list-windows returns
-# FM_FAKE_TMUX_WINDOW, capture-pane echoes FM_FAKE_TMUX_CAPTURE) plus a fake
+# FM_FAKE_TMUX_WINDOW, the pane inventory lists those windows - a bare name in
+# session firstmate - plus every window it created and every recorded one,
+# capture-pane echoes FM_FAKE_TMUX_CAPTURE) plus a fake
 # treehouse (durable lease of FM_FAKE_TREEHOUSE_HOME, recording the lease holder
 # to FM_FAKE_TREEHOUSE_LEASE_FILE; `return` removes the target and lease unless
 # FM_FAKE_TREEHOUSE_RETURN_FAIL is set). Echoes the fakebin dir.
@@ -26,9 +30,27 @@ make_fake_tmux() {
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
-  has-session|new-session|new-window|send-keys|kill-window)
+  new-window)
+    printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
+    exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@"
+    ;;
+  has-session|new-session|send-keys|kill-window)
     printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
     exit 0
+    ;;
+  list-panes)
+    inventory=
+    while IFS= read -r recorded; do
+      case "$recorded" in
+        '') ;;
+        *:*) inventory="$inventory $recorded" ;;
+        *) inventory="$inventory firstmate:$recorded" ;;
+      esac
+    done <<EOF
+${FM_FAKE_TMUX_WINDOW:-}
+EOF
+    FM_FAKE_TMUX_INVENTORY="${FM_FAKE_TMUX_INVENTORY:-}$inventory" \
+      exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")"
     ;;
   list-windows)
     session=
@@ -114,6 +136,7 @@ exit 0
 SH
   chmod +x "$fakebin/tmux"
   chmod +x "$fakebin/treehouse"
+  fm_test_fake_tmux_inventory "$fakebin"
   : > "$dir/tmux.log"
   printf '%s\n' "$fakebin"
 }

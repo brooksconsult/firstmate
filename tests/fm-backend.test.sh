@@ -31,6 +31,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 fm_git_identity fmtest fmtest@example.invalid
 
 # shellcheck source=/dev/null
@@ -645,6 +647,8 @@ test_backend_of_selector_matches_explicit_target_meta() {
 # --- old vs new: fm-send.sh --------------------------------------------------
 
 make_send_fakebin() {  # <dir> -> echoes fakebin dir; logs every tmux call to $FM_TMUX_LOG
+  # Its pane inventory holds sess:win as pane %7 and a prefix-sharing
+  # sess:win-sibling as pane %8, so a closed or prefix-only target is absent.
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/tmux" <<'SH'
@@ -656,6 +660,7 @@ case "${1:-}" in
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
+  list-panes) printf '0:@3:%%7:1:sess:win\n1:@4:%%8:1:sess:win-sibling\n'; exit 0 ;;
   capture-pane)
     start= end=
     while [ $# -gt 0 ]; do
@@ -688,12 +693,6 @@ run_send_case() {  # <bin-root> <fakebin> <log> <home> -- <send args...>
     "$bin/bin/fm-send.sh" "$@" >/dev/null 2>&1
 }
 
-strip_send_preflight() {  # <log>
-  local preflight
-  preflight=$'tmux\x1fdisplay-message\x1f-p\x1f-t\x1fsess:win\x1f#{pane_id}'
-  awk -v preflight="$preflight" '$0 != preflight { print }' "$1"
-}
-
 # The byte-identical old-vs-new tmux log comparison this test used to run
 # covered the P1 backend extraction, which promised an unchanged command
 # sequence. The composer consolidation (fm-composer-thin-adapter-refactor-r1)
@@ -707,21 +706,32 @@ test_send_tmux_contract() {
   home="$TMP_ROOT/send-home"; mkdir -p "$home/state"
   log="$TMP_ROOT/send-new.log"
 
-  # Case 1: --key path - target verified, named key sent, no typing.
+  # Case 1: --key path - target resolved exactly from the pane inventory, the
+  # named key sent to the resolved pane id, no typing.
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" --key Escape
   rc=$?
   expect_code 0 "$rc" "fm-send --key should succeed against a live fake pane"
-  assert_contains "$(cat "$log")" $'\x1f''display-message'$'\x1f''-p'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''#{pane_id}' \
-    "fm-send --key did not verify the explicit tmux target before sending"
-  assert_contains "$(cat "$log")" $'\x1f''Escape' "fm-send --key did not send the named key"
+  assert_contains "$(cat "$log")" $'\x1f''list-panes'$'\x1f''-a' \
+    "fm-send --key did not resolve the explicit tmux target from the pane inventory"
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''Escape' \
+    "fm-send --key did not send the named key to the exactly resolved pane"
   assert_not_contains "$(cat "$log")" $'\x1f''-l'$'\x1f' "fm-send --key must not type literal text"
+
+  # A closed window, and a name that is only a prefix of a live window, are
+  # refused before any key reaches a pane.
+  for gone in "sess:gone" "sess:win-sib"; do
+    run_send_case "$ROOT" "$fb" "$log" "$home" -- "$gone" --key Escape
+    rc=$?
+    [ "$rc" -ne 0 ] || fail "fm-send --key must refuse the absent tmux target $gone"
+    assert_not_contains "$(cat "$log")" $'\x1f''send-keys' "fm-send --key sent a key for the absent tmux target $gone"
+  done
 
   # Case 2: plain text - typed literally exactly once, submitted with Enter,
   # confirmed against the bordered-empty fake composer.
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" hello captain
   rc=$?
   expect_code 0 "$rc" "fm-send plain text should confirm against the empty fake composer"
-  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-l'$'\x1f''hello captain' \
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''-l'$'\x1f''hello captain' \
     "fm-send did not send the literal text with send-keys -l"
   [ "$(grep -c $'\x1f''-l'$'\x1f' "$log")" -eq 1 ] \
     || fail "fm-send must type the text exactly once (Enter-only retries, never a retype)"
@@ -733,12 +743,12 @@ test_send_tmux_contract() {
   run_send_case "$ROOT" "$fb" "$log" "$home" -- "sess:win" /some-skill
   rc=$?
   expect_code 0 "$rc" "fm-send /skill should confirm against the empty fake composer"
-  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-l'$'\x1f''/some-skill' \
+  assert_contains "$(cat "$log")" $'\x1f''send-keys'$'\x1f''-t'$'\x1f''%7'$'\x1f''-l'$'\x1f''/some-skill' \
     "fm-send /skill did not type the literal slash command"
   [ "$(grep -c $'\x1f''-l'$'\x1f' "$log")" -eq 1 ] \
     || fail "fm-send /skill must type the text exactly once"
 
-  pass "fm-send.sh: explicit tmux targets are verified; text types once and submits with Enter"
+  pass "fm-send.sh: explicit tmux targets resolve exactly or are refused; text types once and submits with Enter"
 }
 
 # --- old vs new: fm-peek.sh --------------------------------------------------
@@ -752,6 +762,7 @@ make_peek_fakebin() {  # <dir> <capture-output> -> echoes fakebin dir
 set -u
 { printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
 case "\${1:-}" in
+  list-panes) printf '0:@3:%%7:1:sess:win\\n' ;;
   capture-pane) cat "$dir/capture.out" ;;
 esac
 exit 0
@@ -781,12 +792,22 @@ test_peek_conformance_old_vs_new() {
 
   [ "$out_old" = "$out_new" ] || fail "fm-peek output differs old vs new"$'\n'"--- old ---"$'\n'"$out_old"$'\n'"--- new ---"$'\n'"$out_new"
   [ "$out_new" = "$payload" ] || fail "fm-peek did not pass through the fake capture-pane output exactly"
-  diff -u "$log_old" "$log_new" > "$TMP_ROOT/peek-diff.txt" 2>&1 \
-    || fail "fm-peek: tmux command log differs old vs new"$'\n'"$(cat "$TMP_ROOT/peek-diff.txt")"
-  assert_contains "$(cat "$log_new")" $'\x1f''capture-pane'$'\x1f''-p'$'\x1f''-t'$'\x1f''sess:win'$'\x1f''-S'$'\x1f''-25' \
-    "fm-peek did not call capture-pane -p -t <target> -S -<lines> exactly"
+  # The command sequence deliberately differs from the old script: the target
+  # is resolved exactly from the pane inventory and the capture reads the
+  # resolved pane id, so tmux can never answer from another window.
+  assert_contains "$(cat "$log_new")" $'\x1f''list-panes'$'\x1f''-a' \
+    "fm-peek did not resolve its target from the pane inventory"
+  assert_contains "$(cat "$log_new")" $'\x1f''capture-pane'$'\x1f''-p'$'\x1f''-t'$'\x1f''%7'$'\x1f''-S'$'\x1f''-25' \
+    "fm-peek did not call capture-pane -p -t <resolved-pane> -S -<lines> exactly"
 
-  pass "fm-peek.sh: capture-pane invocation and output are byte-identical old vs new"
+  : > "$log_new"
+  out_new=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral_root" FM_HOME="$home" FM_TMUX_LOG="$log_new" \
+    "$ROOT/bin/fm-peek.sh" "sess:gone" 25 2>/dev/null) \
+    && fail "fm-peek must fail for a closed tmux window"
+  [ -z "$out_new" ] || fail "fm-peek printed another pane's content for a closed tmux window"
+  assert_not_contains "$(cat "$log_new")" $'\x1f''capture-pane' "fm-peek captured a pane for a closed tmux window"
+
+  pass "fm-peek.sh: output matches the old script, the target resolves exactly, and a closed window captures nothing"
 }
 
 # --- old vs new: fm-spawn.sh --------------------------------------------------
@@ -803,20 +824,27 @@ case "\${1:-}" in
     for a in "\$@"; do case "\$a" in *pane_current_path*) printf '%s\\n' "$wt"; exit 0 ;; esac; done
     printf 'firstmate\\n'; exit 0 ;;
   list-windows) exit 0 ;;
+  list-panes) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" list "\$(dirname "\$0")" ;;
+  new-window) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" new-window "\$(dirname "\$0")" "\$@" ;;
 esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   fm_fake_exit0 "$fb" treehouse
   printf '%s\n' "$fb"
 }
 
-run_spawn_case() {  # <bin-root> <fakebin> <log> <state> <data> <config> <proj> -- <spawn args...>
-  local bin=$1 fb=$2 log=$3 state=$4 data=$5 config=$6 proj=$7; shift 7
+# run_spawn_case runs spawn against a throwaway firstmate home rather than
+# letting FM_HOME default to the checkout: the shared Treehouse project lock
+# lives under the home's state/, so a checkout-rooted home would pass or fail on
+# whether some earlier suite happened to leave a state/ in the checkout.
+run_spawn_case() {  # <bin-root> <fakebin> <log> <home> <proj> -- <spawn args...>
+  local bin=$1 fb=$2 log=$3 home=$4 proj=$5; shift 5
   [ "${1:-}" = -- ] && shift
   : > "$log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$bin" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
+  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$bin" FM_HOME="$home" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" \
     FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" FM_TMUX_LOG="$log" \
     "$bin/bin/fm-spawn.sh" "$@"
@@ -835,8 +863,8 @@ run_spawn_case() {  # <bin-root> <fakebin> <log> <state> <data> <config> <proj> 
 # pins the name, and targets the window id"), and the real tmux create/kill path
 # by tests/fm-backend-tmux-smoke.test.sh. The send/peek/teardown conformance
 # tests below remain pure extractions and stay. (make_spawn_fakebin and
-# run_spawn_case are retained: test_spawn_default_backend_writes_no_meta_field
-# uses make_spawn_fakebin, and #294's run_spawn_symlink_case uses run_spawn_case.)
+# run_spawn_case are retained: the backend-selection spawn tests below use both,
+# and #294's run_spawn_symlink_case uses run_spawn_case.)
 
 # --- symlinked project prefix must not false-refuse the isolation guard -----
 #
@@ -873,16 +901,19 @@ case "\${1:-}" in
     ;; esac; done
     printf 'firstmate\\n'; exit 0 ;;
   list-windows) exit 0 ;;
+  list-panes) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" list "\$(dirname "\$0")" ;;
+  new-window) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" new-window "\$(dirname "\$0")" "\$@" ;;
 esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   fm_fake_exit0 "$fb" treehouse
   printf '%s\n' "$fb"
 }
 
 run_spawn_symlink_case() {  # <label> <physical|logical>
-  local label=$1 first_reply=$2 real_root link_root proj wt id fb data state config log out rc proj_phys initial_path
+  local label=$1 first_reply=$2 real_root link_root proj wt id fb home log out rc proj_phys initial_path
   real_root="$TMP_ROOT/symlink-real-$label"; link_root="$TMP_ROOT/symlink-link-$label"
   mkdir -p "$real_root"
   ln -s "$real_root" "$link_root"
@@ -902,14 +933,12 @@ run_spawn_symlink_case() {  # <label> <physical|logical>
     *) fail "unknown symlink first-reply mode: $first_reply" ;;
   esac
   fb=$(make_spawn_symlink_fakebin "$TMP_ROOT/symlink-fake-$label" "$initial_path" "$wt")
-  data="$TMP_ROOT/symlink-data-$label"
-  mkdir -p "$data/$id"
-  write_spawn_brief "$data/$id/brief.md" "$id"
-  state="$TMP_ROOT/symlink-state-$label"; config="$TMP_ROOT/symlink-config-$label"
-  mkdir -p "$state" "$config"
+  home="$TMP_ROOT/symlink-home-$label"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config"
+  write_spawn_brief "$home/data/$id/brief.md" "$id"
   log="$TMP_ROOT/symlink-spawn-$label.log"
 
-  out=$(run_spawn_case "$ROOT" "$fb" "$log" "$state" "$data" "$config" "$proj" -- "$id" "$proj" claude --mode no-mistakes --yolo off 2>&1)
+  out=$(run_spawn_case "$ROOT" "$fb" "$log" "$home" "$proj" -- "$id" "$proj" claude --mode no-mistakes --yolo off 2>&1)
   rc=$?
   expect_code 0 "$rc" "fm-spawn.sh should succeed for a project reached through a symlinked prefix when the backend reports $first_reply cwd"$'\n'"$out"
   assert_contains "$out" "worktree=$wt" \
@@ -1059,74 +1088,61 @@ test_spawn_refuses_unknown_fm_backend_env() {
 }
 
 test_spawn_default_backend_writes_no_meta_field() {
-  local proj wt data id state config out
-  proj="$TMP_ROOT/nobackend-project"; wt="$TMP_ROOT/nobackend-wt"; data="$TMP_ROOT/nobackend-data"
+  local proj wt home id out fb
+  proj="$TMP_ROOT/nobackend-project"; wt="$TMP_ROOT/nobackend-wt"; home="$TMP_ROOT/nobackend-home"
   id="nobackendz3"
   fm_git_worktree "$proj" "$wt" "fm/$id"
-  local fb
   fb=$(make_spawn_fakebin "$TMP_ROOT/nobackend-fake" "$wt")
-  mkdir -p "$data/$id"; write_spawn_brief "$data/$id/brief.md" "$id"
-  state="$TMP_ROOT/nobackend-state"; config="$TMP_ROOT/nobackend-config"
-  mkdir -p "$state" "$config"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config"
+  write_spawn_brief "$home/data/$id/brief.md" "$id"
 
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
-    FM_TMUX_LOG="$TMP_ROOT/nobackend.log" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
+  out=$(run_spawn_case "$ROOT" "$fb" "$TMP_ROOT/nobackend.log" "$home" "$proj" -- \
+    "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
   expect_code 0 $? "explicit --backend tmux should spawn successfully"$'\n'"$out"
-  assert_no_grep 'backend=' "$state/$id.meta" \
+  assert_no_grep 'backend=' "$home/state/$id.meta" \
     "an explicit --backend tmux (the default) must not write backend= to meta (P1 compatibility contract)"
   rm -rf "/tmp/fm-$id"
   pass "fm-spawn.sh: an explicit --backend tmux resolves silently and writes no backend= (missing means tmux)"
 }
 
 test_spawn_explicit_backend_flag_beats_autodetect_herdr_env() {
-  local proj wt data id state config out fb
-  proj="$TMP_ROOT/explicit-backend-project"; wt="$TMP_ROOT/explicit-backend-wt"; data="$TMP_ROOT/explicit-backend-data"
+  local proj wt home id out fb
+  proj="$TMP_ROOT/explicit-backend-project"; wt="$TMP_ROOT/explicit-backend-wt"; home="$TMP_ROOT/explicit-backend-home"
   id="explicitbackendz4"
   fm_git_worktree "$proj" "$wt" "fm/$id"
   fb=$(make_spawn_fakebin "$TMP_ROOT/explicit-backend-fake" "$wt")
-  mkdir -p "$data/$id"; write_spawn_brief "$data/$id/brief.md" "$id"
-  state="$TMP_ROOT/explicit-backend-state"; config="$TMP_ROOT/explicit-backend-config"
-  mkdir -p "$state" "$config"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config"
+  write_spawn_brief "$home/data/$id/brief.md" "$id"
 
   # HERDR_ENV=1 is present (as if firstmate itself were running under herdr),
   # but an explicit --backend tmux flag must still win outright.
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
-    FM_TMUX_LOG="$TMP_ROOT/explicit-backend.log" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
+  out=$(HERDR_ENV=1 run_spawn_case "$ROOT" "$fb" "$TMP_ROOT/explicit-backend.log" "$home" "$proj" -- \
+    "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
   expect_code 0 $? "explicit --backend tmux should spawn successfully even with HERDR_ENV=1 set"$'\n'"$out"
-  assert_no_grep 'backend=' "$state/$id.meta" \
+  assert_no_grep 'backend=' "$home/state/$id.meta" \
     "an explicit --backend tmux must win over an ambient HERDR_ENV=1 auto-detect marker"
   rm -rf "/tmp/fm-$id"
   pass "fm-spawn.sh: explicit --backend tmux wins over an ambient HERDR_ENV=1 auto-detect marker"
 }
 
 test_spawn_autodetect_nesting_resolves_tmux_silently() {
-  local proj wt data id state config out fb
-  proj="$TMP_ROOT/nest-project"; wt="$TMP_ROOT/nest-wt"; data="$TMP_ROOT/nest-data"
+  local proj wt home id out fb
+  proj="$TMP_ROOT/nest-project"; wt="$TMP_ROOT/nest-wt"; home="$TMP_ROOT/nest-home"
   id="nestbackendz5"
   fm_git_worktree "$proj" "$wt" "fm/$id"
   fb=$(make_spawn_fakebin "$TMP_ROOT/nest-fake" "$wt")
-  mkdir -p "$data/$id"; write_spawn_brief "$data/$id/brief.md" "$id"
-  state="$TMP_ROOT/nest-state"; config="$TMP_ROOT/nest-config"
-  mkdir -p "$state" "$config"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config"
+  write_spawn_brief "$home/data/$id/brief.md" "$id"
 
   # No --backend, no FM_BACKEND, no config/backend: nothing is explicitly
   # configured, so auto-detect runs. $TMUX and HERDR_ENV=1 are both present
   # (tmux nested inside a herdr pane) - the full fm-spawn.sh pipeline, not just
   # fm_backend_name, must resolve this to tmux and stay completely silent about
   # it (today's default path, byte-identical).
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
-    FM_TMUX_LOG="$TMP_ROOT/nest.log" \
-    "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off 2>&1)
+  out=$(HERDR_ENV=1 run_spawn_case "$ROOT" "$fb" "$TMP_ROOT/nest.log" "$home" "$proj" -- \
+    "$id" "$proj" claude --mode no-mistakes --yolo off 2>&1)
   expect_code 0 $? "fm-spawn.sh should auto-detect tmux and spawn successfully for nested tmux-in-herdr"$'\n'"$out"
-  assert_no_grep 'backend=' "$state/$id.meta" \
+  assert_no_grep 'backend=' "$home/state/$id.meta" \
     "auto-detected nested tmux-in-herdr must resolve to tmux (missing backend= means tmux)"
   case "$out" in
     *NOTICE*) fail "auto-detecting tmux (even nested inside herdr) must stay silent, no NOTICE expected"$'\n'"$out" ;;

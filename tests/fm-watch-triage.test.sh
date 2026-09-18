@@ -3464,6 +3464,7 @@ test_afk_busy_declared_pause_ticking_pane_hands_off_once() {
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   list-windows)
     [ -n "${FM_FAKE_TMUX_WINDOW:-}" ] && printf '%s\n' "${FM_FAKE_TMUX_WINDOW#*:}"
     exit 0 ;;

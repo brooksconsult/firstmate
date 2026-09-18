@@ -43,15 +43,27 @@ new_world() {
   w="$TMP_ROOT/$name"
   mkdir -p "$w/home/state" "$w/home/data" "$w/fakebin" "$w/fake"
   : > "$w/fake/windows"
+  # The live windows are the lines of fake/windows in session main; the pane
+  # inventory lists line N as pane %N.
   cat > "$w/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
   list-windows) cat "$FM_FAKE_DIR/windows" ;;
+  list-panes)
+    n=0
+    while IFS= read -r name; do
+      n=$((n + 1))
+      [ -n "$name" ] && printf '%s:@%s:%%%s:1:main:%s\n' "$n" "$n" "$n" "$name"
+    done < "$FM_FAKE_DIR/windows"
+    ;;
   display-message)
     target=
     for arg in "$@"; do
-      case "$arg" in main:fm-*) target=$arg ;; esac
+      case "$arg" in
+        main:fm-*) target=$arg ;;
+        %[0-9]*) target="main:$(sed -n "${arg#%}p" "$FM_FAKE_DIR/windows")" ;;
+      esac
     done
     case "${*: -1}" in
       *pane_current_command*)

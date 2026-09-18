@@ -45,6 +45,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-ff-lib.sh"
 # shellcheck source=/dev/null
@@ -430,15 +432,21 @@ test_propagate_lib() {
 # ===========================================================================
 
 # A tmux stub that accepts every subcommand and prints nothing, so no window
-# pre-exists and the spawn proceeds to write its meta. Echoes the fakebin dir.
+# pre-exists and the spawn proceeds to write its meta; the windows it creates
+# are listed in its pane inventory. Echoes the fakebin dir.
 make_noop_tmux() {
   local dir=$1 fakebin="$1/fakebin"
   mkdir -p "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
+case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
+esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   # BASE_PATH deliberately omits the developer's node, which the trust
   # registration below needs, so link the real one in rather than presenting a
   # node-less spawn host no real fleet member looks like.
@@ -658,9 +666,11 @@ case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows) exit 0 ;;
-  has-session|new-session|new-window|kill-window) exit 0 ;;
+  has-session|new-session|kill-window) exit 0 ;;
   send-keys)
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
@@ -677,6 +687,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   fm_fake_exit0 "$fakebin" pi
   # BASE_PATH deliberately omits the developer's node, which the trust
   # registration below needs, so link the real one in rather than presenting a
@@ -1087,6 +1098,7 @@ if [ -n "${FM_FAKE_TMUX_LOG:-}" ]; then
   printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
 fi
 case "$*" in
+  list-panes*) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   list-windows*)
     sed -n 's/^window=[^:]*://p' "${FM_HOME:?}"/state/*.meta
     exit 0
@@ -1107,6 +1119,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   cat > "$fakebin/gh" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -2533,6 +2546,7 @@ SH
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in
+  list-panes*) exec "\$(dirname "\$0")/fake-tmux-inventory.sh" list "\$(dirname "\$0")" ;;
   *display-message*'#{pane_current_command}'*) printf '%s' zsh ;;
   *display-message*'#{pane_id}'*) printf '%s' '%1' ;;
   *display-message*'#{cursor_y}'*) printf '%s' 0 ;;

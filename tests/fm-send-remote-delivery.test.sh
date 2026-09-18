@@ -33,6 +33,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=bin/fm-pending-reply-lib.sh
 . "$ROOT/bin/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
@@ -63,6 +65,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
   send-keys)
     shift
     literal=0
@@ -92,6 +95,7 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
+  fm_test_fake_tmux_inventory "$fb"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -746,7 +750,7 @@ test_local_pending_reports_delivered_unconfirmed() {
   # governs it.
   : > "$log"
   rc=0
-  env PATH="$fb:$PATH" FM_FAKE_TMUX_PENDING=1 \
+  env PATH="$fb:$PATH" FM_FAKE_TMUX_PENDING=1 FM_FAKE_TMUX_INVENTORY=sess:win \
     FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
     "$SEND" sess:win "steer text" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")

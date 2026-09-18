@@ -7,8 +7,9 @@
 # backend dispatch, while bin/fm-composer-lib.sh owns the shared verdict.
 #
 # Composer shapes and verdicts are owned by bin/fm-composer-lib.sh.
-# This file owns only tmux's styled capture, cursor and Pi identity primitives,
-# delivery busy read, and submit conversions that consume the shared verdict.
+# This file owns only tmux's exact target resolution, styled capture, cursor and
+# Pi identity primitives, capability descriptor, delivery busy read, and submit
+# conversions that consume the shared verdict.
 # Styled captures remain internal; fm-peek and every human-facing capture stay
 # plain.
 #
@@ -35,17 +36,105 @@
 # Composer classification is NOT owned here: every shape, glyph, border
 # family, geometry rule, and verdict decision lives in the shared
 # bin/fm-composer-lib.sh (fm_composer_classify_screen), sourced below and
-# reused by every backend adapter so the decision cannot drift. This file
-# keeps only tmux's genuine capture-side primitives - the styled pane
-# capture, the #{cursor_y} cursor read, the pi foreground-process identity
-# probe, and the capability descriptor - plus the busy detection and submit
-# cores that consume the shared verdict.
+# reused by every backend adapter so the decision cannot drift.
 
 # shellcheck source=bin/fm-composer-lib.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/fm-composer-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/fm-cursor-lib.sh"
 
+# --- exact target resolution ------------------------------------------------
+#
+# tmux resolves a -t target loosely, so no probe may hand a recorded target to
+# tmux as-is. `display-message -t` names a window that does not exist and
+# still exits 0, answering from the target session's current window, and a
+# missing session, window id, or pane id reads empty with exit 0. A window
+# name that is a prefix of a live window's name resolves to that live window
+# for every command, strict ones included. docs/tmux-backend.md "Exact target
+# resolution" records the empirical basis.
+#
+# fm_tmux_resolve_pane matches the target exactly against one pane inventory
+# read and prints the matched pane's stable id, which tmux resolves exactly or
+# not at all. Accepted forms: %<pane-id>, @<window-id>, <session>:<window-name>,
+# and <session>:<window-index> when no window in that session has the exact
+# name. A window target means its active pane, as in tmux's own resolution.
+# Returns 0 with the pane id printed, 1 when the target is authoritatively
+# absent (no exact match, missing session, or no server), and 2 when the
+# inventory is unreadable or the target is malformed or names more than one
+# window.
+fm_tmux_resolve_pane() {  # <target>
+  local target=${1:-} session='' rest='' inventory status=0
+  case "$target" in
+    %*|@*)
+      case "${target#?}" in ''|*[!0-9]*) return 2 ;; esac
+      ;;
+    *:*)
+      session=${target%%:*}
+      rest=${target#*:}
+      [ -n "$session" ] && [ -n "$rest" ] || return 2
+      ;;
+    *) return 2 ;;
+  esac
+  # Colon-separated with the window name last: tmux rewrites control
+  # characters such as a tab to `_` when the client runs outside tmux under a
+  # non-UTF-8 locale, and a session name can never contain a colon.
+  inventory=$(tmux list-panes -a -F '#{window_index}:#{window_id}:#{pane_id}:#{pane_active}:#{session_name}:#{window_name}' 2>&1) || status=$?
+  if [ "$status" -ne 0 ]; then
+    case "$inventory" in
+      *"no server running on "*|*"error connecting to "*" (No such file or directory)"|*"error connecting to "*" (Connection refused)")
+        return 1
+        ;;
+    esac
+    return 2
+  fi
+  printf '%s\n' "$inventory" | awk -F ':' -v target="$target" -v session="$session" -v rest="$rest" '
+    NF >= 6 {
+      n++; idx[n] = $1; wid[n] = $2; pid[n] = $3; active[n] = $4; ses[n] = $5
+      name[n] = substr($0, length($1) + length($2) + length($3) + length($4) + length($5) + 6)
+    }
+    function pick(kind, key,   i, win, hit) {
+      win = ""; hit = ""
+      for (i = 1; i <= n; i++) {
+        if (session != "" && ses[i] != session) continue
+        if (kind == "pane" && pid[i] != key) continue
+        if (kind == "id" && wid[i] != key) continue
+        if (kind == "name" && name[i] != key) continue
+        if (kind == "index" && idx[i] != key) continue
+        if (kind != "pane" && active[i] != "1") continue
+        if (win != "" && wid[i] != win) { ambiguous = 1; return "" }
+        win = wid[i]; hit = pid[i]
+      }
+      return hit
+    }
+    END {
+      ambiguous = 0
+      if (target ~ /^%/) found = pick("pane", target)
+      else if (target ~ /^@/) found = pick("id", target)
+      else {
+        found = pick("name", rest)
+        if (found == "" && !ambiguous && rest ~ /^[0-9]+$/) found = pick("index", rest)
+      }
+      if (ambiguous) exit 2
+      if (found == "") exit 1
+      print found
+    }'
+}
+
+# fm_tmux_pane_ref: the reference a raw tmux read or send may target. A pane id
+# passes through untouched because tmux resolves one exactly or not at all;
+# every other form resolves through fm_tmux_resolve_pane first, so a caller that
+# already resolved its target pays for the inventory read only once.
+fm_tmux_pane_ref() {  # <target>
+  case "${1:-}" in
+    %*)
+      case "${1#%}" in
+        ''|*[!0-9]*) ;;
+        *) printf '%s\n' "$1"; return 0 ;;
+      esac
+      ;;
+  esac
+  fm_tmux_resolve_pane "${1:-}"
+}
 
 # fm_tmux_strip_ghost: thin adapter over the shared, fleet-wide ghost extractor
 # fm_composer_strip_ghost (bin/fm-composer-lib.sh). It drops de-emphasised
@@ -69,13 +158,17 @@ fm_tmux_strip_ghost() { fm_composer_strip_ghost; }
 # capture is consumed internally by the classifier and is NEVER surfaced
 # (fm-peek and every human/LLM-facing path stay plain).
 fm_tmux_composer_capture() {  # <target>
-  tmux capture-pane -e -p -t "$1" -S 0 -E - 2>/dev/null
+  local pane
+  pane=$(fm_tmux_pane_ref "$1") || return 1
+  tmux capture-pane -e -p -t "$pane" -S 0 -E - 2>/dev/null
 }
 
 # fm_tmux_composer_cursor_row: the pane's cursor row, zero-based, relative to
 # the visible pane - tmux's genuine primitive that no other backend has.
 fm_tmux_composer_cursor_row() {  # <target>
-  tmux display-message -p -t "$1" '#{cursor_y}' 2>/dev/null
+  local pane
+  pane=$(fm_tmux_pane_ref "$1") || return 1
+  tmux display-message -p -t "$pane" '#{cursor_y}' 2>/dev/null
 }
 
 # fm_tmux_composer_caps: the tmux capability descriptor - static data, not
@@ -100,7 +193,8 @@ fm_tmux_composer_caps() {
 # Prints "pi<TAB>idle" or "pi<TAB>working"; exits 1 when the pane is not a
 # live pi.
 fm_tmux_composer_identity() {  # <target>
-  local target=$1 tty pgid tpgid comm found=0 status
+  local target tty pgid tpgid comm found=0 status
+  target=$(fm_tmux_pane_ref "$1") || return 1
   tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || tty=
   case "$tty" in
     /dev/*)
@@ -138,7 +232,8 @@ EOF
 # it (a pi separator pair under the cursor), so the common read never pays
 # for the process probe.
 fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
-  local target=$1 cy pane verdict identity
+  local target cy pane verdict identity
+  target=$(fm_tmux_pane_ref "$1") || { printf 'unknown'; return 0; }
   cy=$(fm_tmux_composer_cursor_row "$target") || { printf 'unknown'; return 0; }
   case "$cy" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
   pane=$(fm_tmux_composer_capture "$target") || { printf 'unknown'; return 0; }
@@ -173,7 +268,8 @@ fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
 # matches fm_tmux_composer_identity, so a pane whose agent exited to a shell has
 # no Cursor foreground process and gets no reclassification.
 fm_tmux_pane_is_cursor() {  # <target>
-  local target=$1 tty pid pgid tpgid comm args argv0
+  local target tty pid pgid tpgid comm args argv0
+  target=$(fm_tmux_pane_ref "$1") || return 1
   tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 1
   case "$tty" in /dev/*) ;; *) return 1 ;; esac
   while read -r pid pgid tpgid comm; do
@@ -198,7 +294,8 @@ fm_pane_input_pending() {  # <target>
 # fm_pane_is_busy: 0 if the pane's last few non-blank lines show a busy footer
 # (an agent mid-turn). Scans a 40-line tail like fm-watch.sh.
 fm_pane_busy_state() {  # <target> [harness] -> busy|idle|unknown
-  local win=$1 harness=${2:-} tail40 visible
+  local win harness=${2:-} tail40 visible
+  win=$(fm_tmux_pane_ref "$1") || { printf 'unknown'; return 0; }
   tail40=$(tmux capture-pane -p -t "$win" -S -40 2>/dev/null) \
     || { printf 'unknown'; return 0; }
   visible=$(printf '%s' "$tail40" | grep -v '^[[:space:]]*$' | tail -12)
@@ -240,7 +337,8 @@ fm_pane_is_busy() {  # <target> [harness]
 # `unknown` verdict is preserved untouched: busy conversion without the
 # transition evidence could mark an undelivered message delivered.
 fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle]
-  local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state
+  local target retries=$2 sleep_s=$3 baseline_idle=${4:-} i=0 j state busy_state
+  target=$(fm_tmux_pane_ref "$1") || { printf 'unknown'; return 0; }
   while :; do
     tmux send-keys -t "$target" Enter 2>/dev/null || true
     sleep "$sleep_s"
@@ -279,7 +377,8 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
 }
 
 fm_tmux_submit_core() {  # <target> <text> <retries> <enter-sleep> <settle>
-  local target=$1 text=$2 retries=$3 sleep_s=$4 settle=$5 baseline_idle='' baseline_state
+  local target text=$2 retries=$3 sleep_s=$4 settle=$5 baseline_idle='' baseline_state
+  target=$(fm_tmux_pane_ref "$1") || { printf 'send-failed'; return 0; }
   # The turn-started baseline must predate our own typing: a pane already
   # busy before the text lands can turn "busy" for reasons unrelated to our
   # Enter, so only a clean idle-to-busy transition may confirm a submit.

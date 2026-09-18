@@ -48,7 +48,8 @@ trap relaunch_cleanup EXIT
 
 # The same lifecycle-modelling tmux stub as tests/fm-control.test.sh: the
 # harness's exit command stops the agent, and a launch-brief literal starts the
-# harness named in `becomes`.
+# harness named in `becomes`. The pane inventory lists every window name in
+# `windows` under session fmses, which exact target resolution reads.
 make_tmux_stub() {  # <dir>
   local fb="$1/fakebin"
   mkdir -p "$fb"
@@ -111,6 +112,16 @@ case "${1:-}" in
     printf 'fakepane\n'; exit 0 ;;
   capture-pane) printf '╭────╮\n│    │\n╰────╯\n'; exit 0 ;;
   list-windows) [ -f "$D/windows" ] && cat "$D/windows"; exit 0 ;;
+  list-panes)
+    n=0
+    if [ -f "$D/windows" ]; then
+      while IFS= read -r w; do
+        [ -n "$w" ] || continue
+        n=$((n + 1))
+        printf '%s:@%s:%%%s:1:fmses:%s\n' "$n" "$n" "$n" "$w"
+      done < "$D/windows"
+    fi
+    exit 0 ;;
 esac
 exit 0
 SH

@@ -75,12 +75,12 @@ test_busy_pane_pending_returns_empty() {
   : > "$sent"
   touch "$dir/.swallow"
   # Pre-check: composer state should be pending (via function, not $()).
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_tmux_composer_state "win" > "$vfile" 2>/dev/null
+  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_tmux_composer_state "%1" > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] || fail "pre-check: composer state expected pending, got '$(cat "$vfile")'"
   # Now test the submit - write verdict to file to avoid nested $().
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=1 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "busy-pane pending should return empty, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
     || fail "proven pending should consume the configured Enter retry budget"
@@ -99,7 +99,7 @@ test_idle_pane_pending_returns_pending() {
   touch "$dir/.swallow"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] || fail "idle-pane pending should return pending, got '$(cat "$vfile")'"
   pass "fm_tmux_submit_enter_core: idle pane + pending composer stays pending (genuine swallow preserved)"
 }
@@ -116,7 +116,7 @@ test_wrapped_continuation_retries_swallowed_enter() {
   touch "$dir/.swallow"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] \
     || fail "wrapped input must remain pending after swallowed Enter, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
@@ -136,7 +136,7 @@ test_placeholder_like_bare_input_retries_swallowed_enter() {
   touch "$dir/.swallow"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] \
     || fail "placeholder-like bare input must remain pending after swallowed Enter, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
@@ -154,7 +154,7 @@ test_busy_pane_composer_clears_first_try() {
   printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
   : > "$sent"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=1 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "busy-pane with cleared composer should return empty, got '$(cat "$vfile")'"
   pass "fm_tmux_submit_enter_core: busy pane clears composer on first Enter - returns empty"
 }
@@ -169,7 +169,7 @@ test_idle_pane_composer_clears_first_try() {
   printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
   : > "$sent"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=0 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "idle-pane with cleared composer should return empty, got '$(cat "$vfile")'"
   pass "fm_tmux_submit_enter_core: idle pane clears composer on first Enter - returns empty as before"
 }
@@ -184,7 +184,7 @@ test_busy_pane_unknown_stays_unknown() {
   touch "$dir/.swallow"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_PANE_BUSY=1 \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = unknown ] \
     || fail "a busy pane must not convert an unsafe composer to empty, got '$(cat "$vfile")'"
   pass "fm_tmux_submit_enter_core: busy conversion is limited to proven pending input"
@@ -201,7 +201,7 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed() {
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
     FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_FAIL_FIRST_CAPTURE=1 \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_APPEND_BUSY=1 \
-    fm_tmux_submit_core "win" "fix" 3 0.05 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_core "%1" "fix" 3 0.05 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = unknown ] \
     || fail "a failed idle-baseline capture must not let a later busy footer confirm delivery, got '$(cat "$vfile")'"
   grep -q 'Working' "$composer" \
@@ -219,12 +219,12 @@ test_busy_pane_ambiguous_pending_retries_without_conversion() {
   : > "$sent"
   printf '╭────────────╮\n│ > fix  │\n╰────────────╯\n' > "$composer"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_tmux_composer_state "win" > "$vfile" 2>/dev/null
+  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" fm_tmux_composer_state "%1" > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending-unproven ] \
     || fail "ambiguous composer text should be pending-unproven, got '$(cat "$vfile")'"
   PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=1 \
     FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
-    fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+    fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending-unproven ] \
     || fail "a busy pane must not convert pending-unproven to empty, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
@@ -246,7 +246,7 @@ test_unrecognized_state_skips_busy_conversion() {
     # shellcheck disable=SC2329
     fm_pane_is_busy() { touch "$busy_called"; return 0; }
     PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
-      fm_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
+      fm_tmux_submit_enter_core "%1" 3 0.05 > "$vfile" 2>/dev/null
   ) || fail "unrecognized-state submit check failed"
   [ "$(cat "$vfile")" = future-state ] \
     || fail "unrecognized state should be preserved, got '$(cat "$vfile")'"
@@ -263,7 +263,7 @@ test_claude_busy_signature_uses_real_capture_shapes() {
   pane_busy() {
     PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
       bash -c '. "$1/bin/fm-tmux-lib.sh"; fm_pane_is_busy "$2" "$3"' \
-      _ "$ROOT" "$1" "${2:-}"
+      _ "$ROOT" %1 "${2:-}"
   }
 
   # Live Claude 2.1.220 capture 1: spinner glyph and word from one turn.

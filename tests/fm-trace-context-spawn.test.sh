@@ -6,6 +6,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-trace-context-lib.sh"
 
@@ -36,6 +38,8 @@ case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows)
     [ -z "${FM_FAKE_DUPLICATE_WINDOW:-}" ] || printf '%s\n' "$FM_FAKE_DUPLICATE_WINDOW"
@@ -89,6 +93,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   fm_fake_exit0 "$fakebin" treehouse
   printf '%s\n' "$fakebin"
 }
@@ -431,7 +436,7 @@ test_relaunch_reuses_recorded_carrier() {
   # restarts.
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
-  expect_code 0 "$status" "relaunch spawn should succeed"
+  expect_code 0 "$status" "relaunch spawn should succeed: $out"
   assert_contains "$out" "spawned $CASE_ID" "relaunch spawn should report success"
   second=$(meta_traceparent "$meta")
   injected=$(injected_traceparent "$LAUNCH_LOG")

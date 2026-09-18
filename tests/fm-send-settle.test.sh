@@ -30,6 +30,7 @@ TMP_ROOT=$(fm_test_tmproot fm-send-settle)
 # capture-pane returns an empty bordered composer so fm_tmux_composer_state reads
 # "empty" (submit landed) on the first Enter. The sleep log path comes from
 # FM_SLEEP_LOG.
+# The stub's pane inventory holds the one live window sess:win.
 make_stubs() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -37,6 +38,7 @@ make_stubs() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
+  list-panes) printf '0:@1:%%1:1:sess:win\n'; exit 0 ;;
   send-keys) exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done

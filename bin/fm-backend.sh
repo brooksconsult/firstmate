@@ -830,9 +830,11 @@ fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pe
 # going through fm_backend_herdr_target_ready (which auto-starts the herdr
 # server as a side effect via fm_backend_herdr_server_ensure - fine for an
 # operation that is about to use the pane, wrong for a passive liveness
-# probe). A gone tmux window or an unqueryable herdr pane (server down, pane
-# closed), missing zellij pane, or unreadable Orca terminal simply fails, which
-# IS "does not exist" for this purpose.
+# probe). A tmux target must match an existing pane exactly (see
+# fm_tmux_resolve_pane in bin/fm-tmux-lib.sh; tmux's own -t lookup answers a
+# closed window from another one). A gone tmux window or an unqueryable herdr
+# pane (server down, pane closed), missing zellij pane, or unreadable Orca
+# terminal simply fails, which IS "does not exist" for this purpose.
 # Mirrors fm-crew-state.sh's pane_readable check; exists here as one shared
 # primitive so callers that only need a fast alive/dead read (recovery
 # digests, the session-start fleet digest) do not re-derive it inline.
@@ -840,7 +842,8 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 expected_label=${3:-} session pane
   case "$backend" in
     tmux)
-      tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+      fm_backend_source tmux || return 1
+      fm_tmux_resolve_pane "$target" >/dev/null 2>&1
       ;;
     herdr)
       fm_backend_source herdr || return 1
@@ -887,14 +890,15 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # Only `dead` and `missing` license recovery. Every `alive` is proven at
 # process level through the shared classifier in bin/fm-agent-process-lib.sh,
 # never from a registration or a rendered title alone. The tmux adapter
-# requires a successful session inventory and returns `missing` only when it
-# omits the exact window; the Herdr adapter reuses its strict husk classifier -
-# which verifies a registered agent against `pane process-info` and the real
-# process table, so a registration Herdr kept over a shell-only pane reads
-# `dead` here (issue #4115) - then maps a positively stopped session server to
-# `missing` only in this recovery-grade view. Zellij remains unverified because
-# its secondmate ghost-tab and agent-process recovery path has not been
-# empirically validated. Orca and cmux do not support secondmate spawns.
+# returns `missing` only when fm_tmux_resolve_pane (bin/fm-tmux-lib.sh) proves
+# the exact recorded window absent; the Herdr adapter reuses its strict husk
+# classifier - which verifies a registered agent against `pane process-info`
+# and the real process table, so a registration Herdr kept over a shell-only
+# pane reads `dead` here (issue #4115) - then maps a positively stopped session
+# server to `missing` only in this recovery-grade view. Zellij remains
+# unverified because its secondmate ghost-tab and agent-process recovery path
+# has not been empirically validated. Orca and cmux do not support secondmate
+# spawns.
 fm_backend_agent_state() {  # <backend> <target>
   local backend=$1 target=$2
   fm_backend_source "$backend" || { printf 'unverified'; return 0; }

@@ -36,6 +36,8 @@ set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 # bin/fm-harness.sh checks verified ENV markers before ancestry. A suite run
 # from inside another harness inherits those markers, which outrank the fake
@@ -483,9 +485,11 @@ case "$*" in
   *"#{cursor_y}"*) printf '1\n'; exit 0 ;;
 esac
 case "${1:-}" in
+  list-panes) exec "$(dirname "$0")/fake-tmux-inventory.sh" list "$(dirname "$0")" ;;
+  new-window) exec "$(dirname "$0")/fake-tmux-inventory.sh" new-window "$(dirname "$0")" "$@" ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows) exit 0 ;;
-  has-session|new-session|new-window|kill-window) exit 0 ;;
+  has-session|new-session|kill-window) exit 0 ;;
   send-keys)
     literal=
     prev=
@@ -529,6 +533,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  fm_test_fake_tmux_inventory "$fakebin"
   cat > "$fakebin/agy" <<'SH'
 #!/usr/bin/env bash
 set -u
